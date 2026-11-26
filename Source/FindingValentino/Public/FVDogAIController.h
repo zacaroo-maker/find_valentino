@@ -33,6 +33,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Dog")
 	bool IsSunny(const FVector& GroundPoint) const;
 
+	/** Dog park game of tag: "you're it" - chase Target. Ignored if not at the park or resting. */
+	void RequestChase(AFVDog* Target);
+
+	/** How fast dogs run while playing (multiplies walking speed). */
+	UPROPERTY(EditAnywhere, Category = "Dog|Park")
+	float RunMultiplier = 2.6f;
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -45,6 +52,20 @@ private:
 	void StartGoingToSun();
 	void StartLyingDown();
 	FVector SunDirection() const;
+
+	// ---- dog park ----
+	void TickPark(class AFVDogPark* Park, float DeltaSeconds);
+	void ChooseParkActivity(class AFVDogPark* Park);
+	bool bParkMode = false;
+	/** Tagged dogs count to three before giving chase. */
+	float ChaseDelay = 0.f;
+	/** Just tagged someone: can't be tagged straight back. */
+	float TagImmune = 0.f;
+public:
+	bool CanBeTagged() const { return TagImmune <= 0.f; }
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<AFVDog> ChaseTarget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AFVDog> Dog;

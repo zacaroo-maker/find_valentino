@@ -16,7 +16,9 @@ enum class EFVDogState : uint8
 	LyingDown,
 	Lying,
 	GettingUp,
-	Held
+	Held,
+	Play,  // chasing another dog / zoomies (dog park)
+	Bark
 };
 
 UCLASS()
@@ -64,6 +66,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Dog")
 	FText GetThought() const { return Thought; }
 
+	/** Show this dog's energy meter on the HUD (Diego yes, the dogs at the park no). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog")
+	bool bShowMeter = true;
+
+	/** Bark! A little hop and a WOOF (YIP for small dogs, BORK for big ones). */
+	UFUNCTION(BlueprintCallable, Category = "Dog")
+	void Bark();
+	/** Say something in the thought bubble for a while (overrides his idle thoughts). */
+	void Say(const FText& Text, float Seconds);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Sound")
+	TObjectPtr<class USoundBase> BarkSound;
+
+	/** Set by the AI: multiplies walking speed (running while playing). */
+	float PlaySpeed = 1.f;
+	/** Set by the AI: he's at the dog park (changes what he thinks about). */
+	bool bInPark = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Animation")
 	TObjectPtr<UAnimSequence> IdleAnim;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Animation")
@@ -107,5 +126,7 @@ private:
 	float ThoughtTimeLeft = 0.f;
 	float HappyTimeLeft = 0.f;
 	float PetCooldown = 0.f;
+	float SayTimeLeft = 0.f;
+	float BarkCooldown = 0.f;
 	bool bHeld = false;
 };

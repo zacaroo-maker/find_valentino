@@ -129,8 +129,41 @@ static FText PickThought(std::initializer_list<const TCHAR*> Options)
 	return FText::FromString(*(Options.begin() + I));
 }
 
+void AFVDog::Say(const FText& Text, float Seconds)
+{
+	Thought = Text;
+	SayTimeLeft = Seconds;
+}
+
+void AFVDog::Bark()
+{
+	if (BarkCooldown > 0.f)
+	{
+		return;
+	}
+	BarkCooldown = 1.2f;
+	const float Size = GetActorScale3D().Z;
+	Say(Size < 0.8f ? PickThought({TEXT("YIP YIP!"), TEXT("YIP!"), TEXT("YAP YAP YAP!")})
+	  : Size > 1.5f ? PickThought({TEXT("WOOF!!"), TEXT("BORK!"), TEXT("WOOF WOOF!")})
+	                : PickThought({TEXT("WOOF!"), TEXT("ARF ARF!"), TEXT("WOOF WOOF!")}), 1.6f);
+	if (!bHeld && GetCharacterMovement()->IsMovingOnGround())
+	{
+		LaunchCharacter(FVector(0.f, 0.f, 150.f), false, false); // a little bounce with each bark
+	}
+	if (BarkSound)
+	{
+		// big dogs bark deeper
+		UGameplayStatics::PlaySoundAtLocation(this, BarkSound, GetActorLocation(), 1.f, FMath::Clamp(1.2f / FMath::Max(Size, 0.3f), 0.6f, 1.8f));
+	}
+}
+
 void AFVDog::UpdateThought(float DeltaSeconds)
 {
+	if (SayTimeLeft > 0.f)
+	{
+		SayTimeLeft -= DeltaSeconds;
+		return;
+	}
 	ThoughtTimeLeft -= DeltaSeconds;
 	if (State != ThoughtState)
 	{
@@ -170,6 +203,23 @@ void AFVDog::UpdateThought(float DeltaSeconds)
 		Thought = PickThought({ TEXT("Hello, shell friend!"), TEXT("Valentino! Wanna play?"), TEXT("Why is he so slow?") });
 		return;
 	}
+	if (bInPark)
+	{
+		switch (State)
+		{
+		case EFVDogState::Play:
+			Thought = PickThought({TEXT("Can't catch me!"), TEXT("Run run run!"), TEXT("ZOOMIES!!"), TEXT("Wheee!"), TEXT("Best day ever!")});
+			return;
+		case EFVDogState::Lying:
+			Thought = PickThought({TEXT("Phew... need a rest."), TEXT("Played out..."), TEXT("Five more minutes.")});
+			return;
+		case EFVDogState::Sniff:
+			Thought = PickThought({TEXT("So many smells!"), TEXT("Who's been here?"), TEXT("New friends!")});
+			return;
+		default:
+			break;
+		}
+	}
 	if (Energy < 0.25f && State != EFVDogState::Lying)
 	{
 		Thought = PickThought({ TEXT("So sleepy..."), TEXT("I need a sunny nap."), TEXT("Paws... so... tired...") });
@@ -205,6 +255,8 @@ void AFVDog::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	PetCooldown -= DeltaSeconds;
 	HappyTimeLeft -= DeltaSeconds;
+	BarkCooldown -= DeltaSeconds;
+	const float Size = FMath::Max(GetActorScale3D().Z, 0.3f);
 
 	// energy: walking and being awake cost energy, sunbathing recharges
 	const float Speed = GetVelocity().Size2D();
@@ -217,7 +269,9 @@ void AFVDog::Tick(float DeltaSeconds)
 		Energy -= AwakeDrainPerSecond * DeltaSeconds + (Speed * DeltaSeconds / 100.f) * DrainPerMetre;
 	}
 	Energy = FMath::Clamp(Energy, 0.f, 1.f);
-	GetCharacterMovement()->MaxWalkSpeed = 60.f + 70.f * Energy; // tired dogs plod
+	// tired dogs plod, playing dogs run, bigger dogs take longer strides
+	GetCharacterMovement()->MaxWalkSpeed = (60.f + 70.f * Energy) * PlaySpeed * FMath::Sqrt(Size);
+	GetCharacterMovement()->MaxAcceleration = PlaySpeed > 1.f ? 900.f : 400.f;
 
 	UpdateThought(DeltaSeconds);
 
@@ -238,7 +292,7 @@ void AFVDog::Tick(float DeltaSeconds)
 	}
 	if (Speed > 10.f)
 	{
-		PlayAnim(WalkAnim, true, FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.f), 0.4f, 2.f));
+		PlayAnim(WalkAnim, true, FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed * Size, 1.f), 0.4f, 3.5f));
 	}
 	else
 	{

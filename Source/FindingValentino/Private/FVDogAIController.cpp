@@ -4,6 +4,8 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "EngineUtils.h"
+#include "FVDogPark.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -156,6 +158,217 @@ void AFVDogAIController::StartLyingDown()
 	StateTimeLeft = Dog ? Dog->PlayOnce(Dog->LieDownAnim) : 0.f;
 }
 
+// ---------------------------------------------------------------- dog park
+
+void AFVDogAIController::RequestChase(AFVDog* Target)
+{
+	if (!Dog || !Target || !bParkMode || Dog->IsHeld() || State == EFVDogState::Lying || State == EFVDogState::LyingDown || State == EFVDogState::GettingUp)
+	{
+		return;
+	}
+	ChaseTarget = Target;
+	Dog->SetPoseLoop(nullptr);
+	Dog->PlaySpeed = RunMultiplier;
+	SetState(EFVDogState::Play);
+	StopMovement();
+	bMoveDone = false;
+	ChaseDelay = 1.5f; // count to three, then chase
+	StateTimeLeft = FMath::FRandRange(6.f, 10.f);
+	Dog->Say(FText::FromString(TEXT("I'm it! 1.. 2.. 3..")), 1.6f);
+}
+
+void AFVDogAIController::ChooseParkActivity(AFVDogPark* Park)
+{
+	ChaseTarget = nullptr;
+	Dog->SetPoseLoop(nullptr);
+	if (Dog->Energy < 0.15f)
+	{
+		Dog->PlaySpeed = 1.f;
+		StartLyingDown(); // worn out: flop down for a rest
+		return;
+	}
+	TArray<AFVDog*> Others = Park->DogsInside();
+	Others.Remove(Dog);
+	const float R = FMath::FRand();
+	if (Others.Num() > 0 && R < 0.45f)
+	{
+		// chase someone
+		AFVDog* T = Others[FMath::RandHelper(Others.Num())];
+		ChaseTarget = T;
+		Dog->PlaySpeed = RunMultiplier;
+		SetState(EFVDogState::Play);
+		bMoveDone = false;
+		MoveToActor(T, 40.f);
+		StateTimeLeft = FMath::FRandRange(5.f, 9.f);
+		return;
+	}
+	if (R < 0.65f)
+	{
+		// zoomies to somewhere far across the park
+		FVector Dest = Park->RandomPoint();
+		for (int32 i = 0; i < 4 && FVector::Dist2D(Dest, Dog->GetActorLocation()) < 600.f; ++i)
+		{
+			Dest = Park->RandomPoint();
+		}
+		Dog->PlaySpeed = RunMultiplier * 1.1f;
+		SetState(EFVDogState::Play);
+		bMoveDone = false;
+		MoveToLocation(Dest, 40.f);
+		StateTimeLeft = 8.f;
+		return;
+	}
+	if (Others.Num() > 0 && R < 0.82f)
+	{
+		// bark at the nearest dog
+		AFVDog* Near = nullptr;
+		float Best = 900.f;
+		for (AFVDog* O : Others)
+		{
+			const float D = FVector::Dist2D(O->GetActorLocation(), Dog->GetActorLocation());
+			if (D < Best)
+			{
+				Best = D;
+				Near = O;
+			}
+		}
+		if (Near)
+		{
+			StopMovement();
+			ChaseTarget = Near;
+			Dog->PlaySpeed = 1.f;
+			SetState(EFVDogState::Bark);
+			StateTimeLeft = FMath::FRandRange(1.5f, 3.f);
+			Dog->Bark();
+			return;
+		}
+	}
+	// sniff around a bit
+	Dog->PlaySpeed = 1.f;
+	StartSniff();
+	StateTimeLeft = FMath::FRandRange(2.f, 4.f);
+}
+
+void AFVDogAIController::TickPark(AFVDogPark* Park, float DeltaSeconds)
+{
+	if (!bParkMode)
+	{
+		bParkMode = true;
+		Dog->bInPark = true;
+		StopMovement();
+		StateTimeLeft = FMath::FRandRange(0.5f, 2.f);
+		SetState(EFVDogState::Sniff);
+		Dog->SetPoseLoop(nullptr);
+		Dog->Say(FText::FromString(TEXT("THE DOG PARK!!")), 2.5f);
+		Dog->Bark();
+	}
+	StateTimeLeft -= DeltaSeconds;
+	TagImmune -= DeltaSeconds;
+
+	switch (State)
+	{
+	case EFVDogState::Play:
+		if (ChaseDelay > 0.f)
+		{
+			ChaseDelay -= DeltaSeconds;
+			if (ChaseDelay <= 0.f && ChaseTarget)
+			{
+				Dog->Say(FText::FromString(TEXT("Ready or not!")), 1.2f);
+				Dog->Bark();
+				MoveToActor(ChaseTarget, 40.f);
+			}
+			break;
+		}
+		if (ChaseTarget)
+		{
+			// caught them? tag - they're it now
+			AFVDogAIController* Other = Cast<AFVDogAIController>(ChaseTarget->GetController());
+			const float Reach = 70.f * FMath::Max(Dog->GetActorScale3D().X, ChaseTarget->GetActorScale3D().X);
+			if (FVector::Dist2D(ChaseTarget->GetActorLocation(), Dog->GetActorLocation()) < Reach + 40.f && (!Other || Other->CanBeTagged()))
+			{
+				Dog->Bark();
+				Dog->Say(FText::FromString(TEXT("TAG! You're it!")), 1.8f);
+				TagImmune = 4.f;
+				if (Other)
+				{
+					Other->RequestChase(Dog);
+				}
+				// run away from whoever is it now
+				ChaseTarget = nullptr;
+				const FVector Away = Park->RandomPoint();
+				bMoveDone = false;
+				MoveToLocation(Away, 40.f);
+				Dog->PlaySpeed = RunMultiplier * 1.15f;
+				StateTimeLeft = 6.f;
+				break;
+			}
+			if (!Park->Contains(ChaseTarget->GetActorLocation()) || ChaseTarget->IsHeld())
+			{
+				StateTimeLeft = 0.f; // they left (or got picked up)
+			}
+		}
+		if ((bMoveDone && !ChaseTarget) || StateTimeLeft <= 0.f)
+		{
+			StopMovement();
+			ChooseParkActivity(Park);
+		}
+		break;
+
+	case EFVDogState::Bark:
+		if (ChaseTarget)
+		{
+			const FVector To = (ChaseTarget->GetActorLocation() - Dog->GetActorLocation()).GetSafeNormal2D();
+			Dog->SetActorRotation(FMath::RInterpTo(Dog->GetActorRotation(), To.Rotation(), DeltaSeconds, 6.f));
+			if (FMath::FRand() < DeltaSeconds * 0.8f)
+			{
+				Dog->Bark(); // keeps barking now and then
+			}
+		}
+		if (StateTimeLeft <= 0.f)
+		{
+			// often the barked-at dog starts a chase
+			if (ChaseTarget && FMath::FRand() < 0.5f)
+			{
+				if (AFVDogAIController* Other = Cast<AFVDogAIController>(ChaseTarget->GetController()))
+				{
+					Other->RequestChase(Dog);
+				}
+			}
+			ChooseParkActivity(Park);
+		}
+		break;
+
+	case EFVDogState::LyingDown:
+		if (StateTimeLeft <= 0.f)
+		{
+			SetState(EFVDogState::Lying);
+			Dog->SetPoseLoop(Dog->LyingAnim);
+			StateTimeLeft = FMath::FRandRange(12.f, 25.f);
+		}
+		break;
+
+	case EFVDogState::Lying:
+		if (StateTimeLeft <= 0.f || Dog->Energy > 0.6f)
+		{
+			SetState(EFVDogState::GettingUp);
+			StateTimeLeft = Dog->PlayOnce(Dog->GetUpAnim);
+		}
+		break;
+
+	case EFVDogState::GettingUp:
+	case EFVDogState::Sniff:
+	case EFVDogState::Wander:
+	case EFVDogState::GoingToSun:
+		if (StateTimeLeft <= 0.f || (State == EFVDogState::Wander && bMoveDone))
+		{
+			ChooseParkActivity(Park);
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
 void AFVDogAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
 	Super::OnMoveCompleted(RequestID, Result);
@@ -192,6 +405,23 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 		SetState(EFVDogState::Sniff);
 		Dog->SetPoseLoop(nullptr);
 		StateTimeLeft = FMath::Max(StateTimeLeft, 3.f);
+	}
+
+	// at the dog park: play instead of the garden routine
+	if (AFVDogPark* Park = AFVDogPark::FindAt(this, Dog->GetActorLocation()))
+	{
+		TickPark(Park, DeltaSeconds);
+		return;
+	}
+	if (bParkMode)
+	{
+		// carried home: back to normal life
+		bParkMode = false;
+		Dog->bInPark = false;
+		Dog->PlaySpeed = 1.f;
+		ChaseTarget = nullptr;
+		WanderLegsLeft = 1;
+		StartSniff();
 	}
 
 	StateTimeLeft -= DeltaSeconds;

@@ -251,10 +251,6 @@ void AFVMenuHUD::HandleKeys()
 	{
 		Cursor = (Cursor + 1) % N;
 	}
-	if (Screen == EFVMenuScreen::Who && Cursor < Family.Num())
-	{
-		Selected = Cursor; // preview while browsing
-	}
 	if (Pressed({EKeys::Enter, EKeys::SpaceBar, EKeys::Gamepad_FaceButton_Bottom}) && ScreenTime > 0.15f)
 	{
 		Activate(Cursor);
@@ -387,15 +383,23 @@ void AFVMenuHUD::DrawWho()
 	for (int32 i = 0; i < Family.Num(); ++i)
 	{
 		const FString Name = Family[i] ? Family[i]->DisplayName.ToString() : TEXT("?");
-		Y += MenuButton(Name, i, ListCX, Y, ListW, M) + 1.6f * M;
+		const float H = MenuButton(Name, i, ListCX, Y, ListW, M);
+		if (i == Selected)
+		{
+			// a heart marks who is picked (pointing at someone only previews them)
+			const float HS = M * 0.7f;
+			DrawHeart(this, ListCX + ListW * 0.5f - 10.f * HS, Y + (H - 6.f * HS) * 0.5f, HS, Red);
+		}
+		Y += H + 1.6f * M;
 	}
 
-	// details card (right)
-	if (!Family.IsValidIndex(Selected) || !Family[Selected])
+	// details card (right): whoever is pointed at, otherwise whoever is picked
+	const int32 Show = Cursor < Family.Num() ? Cursor : Selected;
+	if (!Family.IsValidIndex(Show) || !Family[Show])
 	{
 		return;
 	}
-	const UFVFamilyMemberData* F = Family[Selected];
+	const UFVFamilyMemberData* F = Family[Show];
 	const float CX = ListCX + ListW * 0.5f + 8.f * M;
 	const float CWd = CW * 0.92f - CX;
 	const float CY = CH * 0.25f;
@@ -428,6 +432,9 @@ void AFVMenuHUD::DrawWho()
 		FVPixel::DrawText(this, Line, CX + Pad, LY, S, White);
 		LY += 10.f * S;
 	}
+	const bool bPicked = (Show == Selected);
+	FVPixel::DrawText(this, bPicked ? TEXT("PICKED!") : TEXT("CLICK OR ENTER TO PICK"), CX + Pad, CY + CHt - Pad - 7.f * S, S,
+		bPicked ? Yellow : (FMath::Fmod(Time, 1.f) < 0.6f ? Cyan : Grey));
 
 	// START! and BACK under the card
 	const float BY = CY + CHt + 3.f * P;
