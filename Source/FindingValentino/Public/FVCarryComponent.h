@@ -26,6 +26,12 @@ public:
 	/** Use the held item - e.g. pour the watering can (mapped to left mouse). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
 	TObjectPtr<UInputAction> UseAction;
+	/** Pet the dog (mapped to F). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
+	TObjectPtr<UInputAction> PetAction;
+	/** Where the dog is held (relative to the capsule centre). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
+	FVector DogCarryOffset = FVector(38.f, 0.f, 0.f);
 
 	/** How far (cm, from the character's centre) Valentino can be reached. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
@@ -55,9 +61,14 @@ public:
 	void UseStarted();
 	UFUNCTION(BlueprintCallable, Category = "Carry")
 	void UseStopped();
+	UFUNCTION(BlueprintCallable, Category = "Carry")
+	void Pet();
+	/** Prompt for the pet key; empty when no dog in reach. */
+	UFUNCTION(BlueprintPure, Category = "Carry")
+	FText GetPetPrompt() const;
 
 	UFUNCTION(BlueprintPure, Category = "Carry")
-	bool IsCarrying() const { return Carried != nullptr; }
+	bool IsCarrying() const { return Carried != nullptr || CarriedDog != nullptr; }
 	UFUNCTION(BlueprintPure, Category = "Carry")
 	bool IsHoldingFood() const;
 	AFVPickupItem* GetHeldItem() const { return HeldItem; }
@@ -84,7 +95,12 @@ private:
 	bool FindValentinoDrop(FVector& OutLocation) const;
 	bool FindItemDrop(FVector& OutGround, float& OutYaw) const;
 	AFVPond* FindNearbyPond() const;
-	bool PreferValentino(const AFVValentino* V, const AFVPickupItem* Item) const;
+	class AFVDog* FindReachableDog() const;
+	bool FindCharacterDrop(ACharacter* Who, FVector& OutLocation) const;
+	/** How directly the player is aiming at a point (1 = dead centre). */
+	float AimAt(const FVector& Point) const;
+	/** Pick the single thing E would act on with free hands. */
+	void ChooseCandidate(AFVValentino*& V, class AFVDog*& D, AFVPickupItem*& I) const;
 	FVector GetViewDir2D() const;
 
 	UPROPERTY(Transient)
@@ -95,6 +111,13 @@ private:
 	TObjectPtr<AFVValentino> CandidateValentino;
 	UPROPERTY(Transient)
 	TObjectPtr<AFVPickupItem> CandidateItem;
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVDog> CarriedDog;
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVDog> CandidateDog;
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVDog> PettableDog;
+	int32 PetCount = 0;
 
 	bool bInputBound = false;
 	bool bUseHeld = false;

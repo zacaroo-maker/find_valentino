@@ -1,4 +1,4 @@
-# Finding Valentino
+﻿# Finding Valentino
 
 A relaxing Unreal Engine 5.8 exploration game: search a lush backyard for **Valentino**, a Hermann's tortoise with a mind of his own.
 
@@ -18,4 +18,5 @@ Game assets (`Content/`) are not included: they contain third-party content (Fab
 - `Build.bat FindingValentinoEditor Win64 Development -Project=<path>\FindingValentino.uproject`
 
 ## Controls (prototype)
-WASD move · mouse look · Space jump · **V** first/third person · **E** pick up / put down / give food · **hold left mouse** pour the watering can
+WASD move Â· mouse look Â· Space jump Â· **V** first/third person Â· **E** pick up / put down / give food Â· **hold left mouse** pour the watering can
+

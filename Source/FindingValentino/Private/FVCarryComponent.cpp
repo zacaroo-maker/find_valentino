@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EngineUtils.h"
+#include "FVDog.h"
 #include "FVPickupItem.h"
 #include "FVPlantBed.h"
 #include "FVPond.h"
@@ -27,6 +28,10 @@ bool UFVCarryComponent::TryBindInput()
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(Owner->InputComponent))
 	{
 		EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &UFVCarryComponent::Interact);
+		if (PetAction)
+		{
+			EIC->BindAction(PetAction, ETriggerEvent::Started, this, &UFVCarryComponent::Pet);
+		}
 		if (UseAction)
 		{
 			EIC->BindAction(UseAction, ETriggerEvent::Started, this, &UFVCarryComponent::UseStarted);
@@ -210,10 +215,9 @@ bool UFVCarryComponent::FindItemDrop(FVector& OutGround, float& OutYaw) const
 	return !bBlocked;
 }
 
-bool UFVCarryComponent::PreferValentino(const AFVValentino* V, const AFVPickupItem* Item) const
+float UFVCarryComponent::AimAt(const FVector& Point) const
 {
-	// whichever is closer to the centre of the view wins (uses the camera pitch too, so looking down at
-	// a dandelion next to Valentino picks the dandelion)
+	// uses the camera pitch too, so looking down at a dandelion next to Valentino picks the dandelion
 	const AActor* Owner = GetOwner();
 	FVector View = Owner->GetActorForwardVector();
 	if (const APawn* P = Cast<APawn>(Owner))
@@ -223,10 +227,103 @@ bool UFVCarryComponent::PreferValentino(const AFVValentino* V, const AFVPickupIt
 			View = C->GetControlRotation().Vector();
 		}
 	}
-	FVector Eye = Owner->GetActorLocation() + FVector(0, 0, 60.f);
-	const float DV = FVector::DotProduct(View, (V->GetActorLocation() - Eye).GetSafeNormal());
-	const float DI = FVector::DotProduct(View, (Item->GetActorLocation() - Eye).GetSafeNormal());
-	return DV >= DI;
+	const FVector Eye = Owner->GetActorLocation() + FVector(0, 0, 60.f);
+	return FVector::DotProduct(View, (Point - Eye).GetSafeNormal());
+}
+
+AFVDog* UFVCarryComponent::FindReachableDog() const
+{
+	const AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return nullptr;
+	}
+	const FVector ViewDir = GetViewDir2D();
+	const float CosLimit = FMath::Cos(FMath::DegreesToRadians(ReachHalfAngleDeg));
+	AFVDog* Best = nullptr;
+	float BestDist = TNumericLimits<float>::Max();
+	for (TActorIterator<AFVDog> It(GetWorld()); It; ++It)
+	{
+		if (It->IsHeld())
+		{
+			continue;
+		}
+		const FVector To = It->GetActorLocation() - Owner->GetActorLocation();
+		const float Dist = To.Size();
+		if (Dist > ReachDistance + 30.f)
+		{
+			continue;
+		}
+		const bool bInView = FVector::DotProduct(ViewDir, To.GetSafeNormal2D()) >= CosLimit;
+		if ((bInView || To.Size2D() < AtFeetDistance + 20.f) && Dist < BestDist)
+		{
+			Best = *It;
+			BestDist = Dist;
+		}
+	}
+	return Best;
+}
+
+void UFVCarryComponent::ChooseCandidate(AFVValentino*& V, AFVDog*& D, AFVPickupItem*& I) const
+{
+	float ItemDist;
+	V = FindReachableValentino();
+	D = FindReachableDog();
+	I = FindReachableItem(ItemDist);
+	const float AV = V ? AimAt(V->GetActorLocation()) : -3.f;
+	const float AD = D ? AimAt(D->GetActorLocation()) : -3.f;
+	const float AI = I ? AimAt(I->Mesh->Bounds.Origin) : -3.f;
+	// keep only the one aimed at most directly
+	if (AV >= AD && AV >= AI) { D = nullptr; I = nullptr; }
+	else if (AD >= AV && AD >= AI) { V = nullptr; I = nullptr; }
+	else { V = nullptr; D = nullptr; }
+}
+
+bool UFVCarryComponent::FindCharacterDrop(ACharacter* Who, FVector& OutLocation) const
+{
+	const ACharacter* Owner = Cast<ACharacter>(GetOwner());
+	if (!Owner || !Who)
+	{
+		return false;
+	}
+	const UCapsuleComponent* Cap = Who->GetCapsuleComponent();
+	const float HalfHeight = Cap->GetScaledCapsuleHalfHeight();
+	const float Radius = Cap->GetScaledCapsuleRadius();
+	const FVector Base = Owner->GetActorLocation() + Owner->GetActorForwardVector() * (PutDownDistance + Radius * 0.5f);
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(FVCarryDrop), false, Owner);
+	Params.AddIgnoredActor(Who);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Base + FVector(0, 0, 60), Base - FVector(0, 0, 250), ECC_Visibility, Params))
+	{
+		OutLocation = Hit.ImpactPoint + FVector(0, 0, HalfHeight + 1.f);
+		const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
+			OutLocation, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(Radius, HalfHeight - 1.f), Params);
+		return !bBlocked;
+	}
+	return false;
+}
+
+void UFVCarryComponent::Pet()
+{
+	AFVDog* Dog = CarriedDog ? CarriedDog.Get() : PettableDog.Get();
+	if (!Dog)
+	{
+		Dog = FindReachableDog();
+	}
+	if (Dog && Dog->Pet())
+	{
+		++PetCount;
+		if (PetCount % 4 == 1)
+		{
+			ShowToast(FText::Format(LOCTEXT("Petted", "{0} loves it! (+energy)"), Dog->DogName), 2.f);
+		}
+	}
+}
+
+FText UFVCarryComponent::GetPetPrompt() const
+{
+	const AFVDog* Dog = CarriedDog ? CarriedDog.Get() : PettableDog.Get();
+	return Dog ? FText::Format(LOCTEXT("PetPrompt", "F  -  Pet {0}"), Dog->DogName) : FText::GetEmpty();
 }
 
 AFVPond* UFVCarryComponent::FindNearbyPond() const
@@ -247,6 +344,17 @@ void UFVCarryComponent::Interact()
 	ACharacter* Owner = Cast<ACharacter>(GetOwner());
 	if (!Owner)
 	{
+		return;
+	}
+	// 0) carrying the dog -> put him down
+	if (CarriedDog)
+	{
+		FVector Drop;
+		if (FindCharacterDrop(CarriedDog, Drop))
+		{
+			CarriedDog->PutDown(Drop, Owner->GetActorRotation().Yaw);
+			CarriedDog = nullptr;
+		}
 		return;
 	}
 	// 1) carrying Valentino -> put him down
@@ -291,14 +399,20 @@ void UFVCarryComponent::Interact()
 		}
 		return;
 	}
-	// 3) hands free -> pick up whatever you're looking at most directly: Valentino or an item
-	float ItemDist;
-	AFVPickupItem* Item = FindReachableItem(ItemDist);
-	AFVValentino* V = FindReachableValentino();
-	if (V && (!Item || PreferValentino(V, Item)))
+	// 3) hands free -> pick up whatever you're looking at most directly: Valentino, the dog or an item
+	AFVValentino* V;
+	AFVDog* D;
+	AFVPickupItem* Item;
+	ChooseCandidate(V, D, Item);
+	if (V)
 	{
 		Carried = V;
 		V->PickUp(Owner, CarryOffset);
+	}
+	else if (D)
+	{
+		CarriedDog = D;
+		D->PickUp(Owner, DogCarryOffset);
 	}
 	else if (Item)
 	{
@@ -314,6 +428,7 @@ void UFVCarryComponent::Interact()
 	}
 	CandidateItem = nullptr;
 	CandidateValentino = nullptr;
+	CandidateDog = nullptr;
 }
 
 void UFVCarryComponent::UseStarted()
@@ -349,6 +464,13 @@ void UFVCarryComponent::UseStopped()
 
 FText UFVCarryComponent::GetPrompt() const
 {
+	if (CarriedDog)
+	{
+		FVector Unused;
+		return FindCharacterDrop(CarriedDog, Unused)
+			? FText::Format(LOCTEXT("PutDog", "E  -  Put {0} down"), CarriedDog->DogName)
+			: FText::Format(LOCTEXT("NoRoomDog", "No room to put {0} down here"), CarriedDog->DogName);
+	}
 	if (Carried)
 	{
 		FVector Unused;
@@ -372,6 +494,10 @@ FText UFVCarryComponent::GetPrompt() const
 	if (CandidateValentino)
 	{
 		return LOCTEXT("PickUp", "E  -  Pick up Valentino");
+	}
+	if (CandidateDog)
+	{
+		return FText::Format(LOCTEXT("PickDog", "E  -  Pick up {0}"), CandidateDog->DogName);
 	}
 	if (CandidateItem)
 	{
@@ -407,28 +533,24 @@ void UFVCarryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	// what could E act on right now?
 	CandidateValentino = nullptr;
 	CandidateItem = nullptr;
-	if (!Carried)
+	CandidateDog = nullptr;
+	PettableDog = nullptr;
+	if (!Carried && !CarriedDog)
 	{
-		CandidateValentino = FindReachableValentino();
 		if (!HeldItem)
 		{
-			float ItemDist;
-			CandidateItem = FindReachableItem(ItemDist);
-			if (CandidateValentino && CandidateItem)
-			{
-				if (PreferValentino(CandidateValentino, CandidateItem))
-				{
-					CandidateItem = nullptr;
-				}
-				else
-				{
-					CandidateValentino = nullptr;
-				}
-			}
+			AFVValentino* V;
+			AFVDog* D;
+			AFVPickupItem* I;
+			ChooseCandidate(V, D, I);
+			CandidateValentino = V;
+			CandidateDog = D;
+			CandidateItem = I;
+			PettableDog = FindReachableDog(); // can pet him even if E would pick up something else
 		}
-		else if (HeldItem->Kind != EFVItemKind::Food)
+		else if (HeldItem->Kind == EFVItemKind::Food)
 		{
-			CandidateValentino = nullptr;
+			CandidateValentino = FindReachableValentino();
 		}
 	}
 

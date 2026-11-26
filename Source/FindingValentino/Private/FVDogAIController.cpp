@@ -169,6 +169,31 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 	{
 		return;
 	}
+	// being carried: the person holding him is in charge
+	if (Dog->IsHeld())
+	{
+		if (State != EFVDogState::Held)
+		{
+			StopMovement();
+			SetState(EFVDogState::Held);
+		}
+		return;
+	}
+	if (State == EFVDogState::Held)
+	{
+		WanderLegsLeft = 1;
+		StartSniff();
+		StateTimeLeft = 2.f;
+	}
+	// being petted while up and about: stop and enjoy it (tail wag)
+	if (Dog->IsHappy() && (State == EFVDogState::Wander || State == EFVDogState::GoingToSun || State == EFVDogState::Sniff))
+	{
+		StopMovement();
+		SetState(EFVDogState::Sniff);
+		Dog->SetPoseLoop(nullptr);
+		StateTimeLeft = FMath::Max(StateTimeLeft, 3.f);
+	}
+
 	StateTimeLeft -= DeltaSeconds;
 
 	switch (State)
@@ -185,7 +210,8 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 		{
 			SetState(EFVDogState::Lying);
 			Dog->SetPoseLoop(Dog->LyingAnim);
-			StateTimeLeft = FMath::RandRange(LieSeconds.X, LieSeconds.Y);
+			// tired dogs sunbathe longer
+			StateTimeLeft = FMath::RandRange(LieSeconds.X, LieSeconds.Y) * (1.6f - Dog->Energy);
 			SunCheckTimeLeft = 15.f;
 		}
 		break;
@@ -234,6 +260,9 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 		{
 			StartSniff();
 		}
+		break;
+
+	case EFVDogState::Held:
 		break;
 	}
 }

@@ -547,7 +547,21 @@ Do not block current work on all of these. Resolve them when they become relevan
   - Setup script: `scripts\ue_setup_features.py`; play-test helper `scripts\pie_test.py` (steps via `Downloads\_step.txt`).
   - Verified in play: feeding (energy 0.53→0.78), watering a bed + toast, refilling at pond, moving a flowerpot, thirst → GoingToPond, dog walks to a sunny spot and lies down. Not yet visually checked: water stream on the can, Valentino actually drinking inside the basin, dog animations up close, sprout appearing (food count suggests it did).
   - Gotchas: food has no collision → use `Mesh->Bounds`, not `GetActorBounds(true)`. Saving while a Fab import runs can freeze the editor.
-- **Next step candidates:** user play-test; dog's name; Dad carry/pour poses; weather → temperature; delete hidden old foliage; Boxwood retry; main menu + character select; relationships.
+- User: "the last version is working pretty good".
+- **The dog is Diego** (the family's real dog: small shaggy white dog with black ears/head-top, wears a red plaid fleece vest). NOTE: this is Diego the dog inside Finding Valentino — unrelated to the user's separate game project "Being Diego"; keep them separate.
+- **User ideas (2026-11-25), being implemented:**
+  - Energy meter for **both** animals (Valentino: energy + thirst; Diego: energy) — always shown top-left.
+  - **Pet Diego** (F key) to give him energy; he stops, wags fast, happy thoughts.
+  - **Thought bubble** above Diego's head that changes with what he's doing/feeling (sun-seeking, napping, sniffing, being carried, being petted, sleepy, near Valentino).
+  - **Pick up Diego** (E) and pet him while carrying him.
+  - Diego's energy: drains while awake/walking, recharges while lying in the sun, +0.06 per pat; tired = slower walk and longer naps.
+  - Implementation: `AFVDog` (Energy, Pet(), PickUp/PutDown, GetThought()/UpdateThought), `AFVDogAIController` (Held state, stops to enjoy pets, nap length × (1.6 − energy)), `UFVCarryComponent` (PetAction/IA_Pet on F, CarriedDog, ChooseCandidate() = whatever you aim at among Valentino/Diego/items, GetPetPrompt()), `AFVHUD` (both meters, pet prompt, thought bubble).
+  - Found while doing this: the previous HUD update had never been saved (write was rejected), so the energy/thirst bars and watering prompt weren't actually on screen in the last version — fixed now.
+  - **Verified with real key presses:** F pets Diego (energy 0.65→0.85, happy thoughts, "Diego loves it!"), E picks up/puts down Diego, F works while carrying him, thought bubble follows him, both meters on screen, real left-click watering drains the can and waters the bed.
+  - **UE 5.8 input gotcha:** key mappings live in `IMC_Default.default_key_mappings.mappings`; the old `IMC.mappings` list is deprecated and ignored at runtime. Left-click (IA_Use) and F (IA_Pet) had been added to the old list and did nothing until fixed with `scripts\ue_input_58.py` (E and V were fine because they came over from 5.4).
+  - Known small issues: the bubble can overlap the top-left meters when Diego is near the top-left of the screen; carried Diego floats beside Dad (no carry pose).
+- **Earlier user ideas, done:** hidden food to give Valentino (lettuce, dandelion, strawberry, worm) for energy; Diego who lies in the sun; a pond with a ramp where Valentino drinks/soaks; move garden items (pots, benches, chairs, leaf piles...); watering can to water plants (watered beds grow food).
+- **Next step candidates:** user play-test; Dad carry/pour/pet poses; weather → temperature; delete hidden old foliage; Boxwood retry; main menu + character select; relationships.
 - (old) **Next step candidates:** bring in the Fab Megascans (in user's Fab library) into the project (Fab plugin in UE / launcher "Add to project", or Download FBX/glTF), weather → temperature, main menu + character select, Dad carry pose, relationship/familiarity system.
 
 ### Instructions for the next session (Claude Code on the Windows PC)

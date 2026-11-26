@@ -15,7 +15,8 @@ enum class EFVDogState : uint8
 	GoingToSun,
 	LyingDown,
 	Lying,
-	GettingUp
+	GettingUp,
+	Held
 };
 
 UCLASS()
@@ -27,7 +28,41 @@ public:
 	AFVDog();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog")
-	FText DogName = NSLOCTEXT("FV", "DogName", "the dog");
+	FText DogName = NSLOCTEXT("FV", "DogName", "Diego");
+
+	// ---- Energy ----
+	/** 0 = worn out, 1 = full of beans. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Energy", meta = (ClampMin = "0", ClampMax = "1"))
+	float Energy = 0.6f;
+	/** Drain while awake (per second) and per metre walked. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Energy")
+	float AwakeDrainPerSecond = 0.0015f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Energy")
+	float DrainPerMetre = 0.004f;
+	/** Recharge per second while lying in the sun. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Energy")
+	float SunRechargePerSecond = 0.004f;
+	/** Energy from one pat. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Energy")
+	float PetEnergy = 0.06f;
+
+	/** Pat him. Returns false if it was too soon after the last pat. */
+	UFUNCTION(BlueprintCallable, Category = "Dog")
+	bool Pet();
+	UFUNCTION(BlueprintPure, Category = "Dog")
+	bool IsHappy() const { return HappyTimeLeft > 0.f; }
+
+	// ---- Being carried ----
+	UFUNCTION(BlueprintCallable, Category = "Dog")
+	void PickUp(AActor* Holder, FVector Offset);
+	UFUNCTION(BlueprintCallable, Category = "Dog")
+	void PutDown(FVector DropLocation, float Yaw);
+	UFUNCTION(BlueprintPure, Category = "Dog")
+	bool IsHeld() const { return bHeld; }
+
+	/** What he's thinking right now (shown in a bubble above his head). */
+	UFUNCTION(BlueprintPure, Category = "Dog")
+	FText GetThought() const { return Thought; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog|Animation")
 	TObjectPtr<UAnimSequence> IdleAnim;
@@ -65,4 +100,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimSequence> PoseLoop;
 	float OneShotTimeLeft = 0.f;
+
+	void UpdateThought(float DeltaSeconds);
+	FText Thought;
+	EFVDogState ThoughtState = EFVDogState::Wander;
+	float ThoughtTimeLeft = 0.f;
+	float HappyTimeLeft = 0.f;
+	float PetCooldown = 0.f;
+	bool bHeld = false;
 };
