@@ -27,6 +27,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family")
 	TSoftClassPtr<class AFVFamilyCharacter> CharacterClass;
 
+	/** Their assembled MetaHuman (e.g. BP_Mom). Used when CharacterClass is empty: the standard family character wears it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family")
+	TSoftClassPtr<AActor> MetaHumanClass;
+	/** Animate with the female mannequin (Quinn) instead of the male one (Manny). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family")
+	bool bFemaleFrame = false;
+
 	// ---- personality / gameplay tuning (from the design: Dad walks faster, Grandpa is slower, kids are energetic...) ----
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family|Movement")
 	float WalkSpeed = 300.f;

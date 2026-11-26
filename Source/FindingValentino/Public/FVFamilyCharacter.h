@@ -60,9 +60,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Family|Animation")
 	bool GetHandTargets(FVector& LeftHand, FVector& RightHand) const;
 
+	/** Applies a family member: speed, eye height, and puts on their MetaHuman if they have one. */
+	UFUNCTION(BlueprintCallable, Category = "Family")
+	void ApplyMemberData(UFVFamilyMemberData* Member);
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	virtual void NotifyControllerChanged() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> MetaHumanActor;
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);

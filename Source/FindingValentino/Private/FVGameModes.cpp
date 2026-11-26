@@ -77,6 +77,11 @@ UClass* AFVGameMode::GetDefaultPawnClassForController_Implementation(AController
 		{
 			return C;
 		}
+		// no character of their own, but a MetaHuman: the standard family character wears it
+		if (!M->MetaHumanClass.IsNull())
+		{
+			return AFVFamilyCharacter::StaticClass();
+		}
 	}
 	return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
@@ -91,7 +96,7 @@ void AFVGameMode::SetPlayerDefaults(APawn* PlayerPawn)
 	}
 	if (AFVFamilyCharacter* FC = Cast<AFVFamilyCharacter>(PlayerPawn))
 	{
-		FC->MemberData = M;
+		FC->ApplyMemberData(M);
 	}
 	if (ACharacter* C = Cast<ACharacter>(PlayerPawn))
 	{

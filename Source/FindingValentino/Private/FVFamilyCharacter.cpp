@@ -8,7 +8,13 @@
 #include "FVCarryComponent.h"
 #include "FVDog.h"
 #include "FVFamilyMemberData.h"
+#include "FVMetaHuman.h"
 #include "FVPickupItem.h"
+#include "Animation/AnimInstance.h"
+#include "Engine/SkeletalMesh.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "UObject/ConstructorHelpers.h"
 #include "FVValentino.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -48,6 +54,44 @@ AFVFamilyCharacter::AFVFamilyCharacter()
 	// meshes face +Y in Unreal; actor forward is +X
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -93.f));
 	GetMesh()->SetRelativeRotation(FRotator(0.f, 270.f, 0.f));
+
+	// defaults so the plain C++ class is playable without a Blueprint (a Blueprint child can override any of these)
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MannyMesh(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny.SKM_Manny"));
+	static ConstructorHelpers::FClassFinder<UAnimInstance> MannyAnim(TEXT("/Game/Characters/Mannequins/Animations/ABP_Manny"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMC(TEXT("/Game/ThirdPerson/Input/IMC_Default.IMC_Default"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAMove(TEXT("/Game/ThirdPerson/Input/Actions/IA_Move.IA_Move"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IALook(TEXT("/Game/ThirdPerson/Input/Actions/IA_Look.IA_Look"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAJump(TEXT("/Game/ThirdPerson/Input/Actions/IA_Jump.IA_Jump"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAView(TEXT("/Game/Core/Input/IA_ToggleView.IA_ToggleView"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAInteract(TEXT("/Game/Core/Input/IA_Interact.IA_Interact"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAUse(TEXT("/Game/Core/Input/IA_Use.IA_Use"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IAPet(TEXT("/Game/Core/Input/IA_Pet.IA_Pet"));
+	if (MannyMesh.Succeeded()) GetMesh()->SetSkeletalMeshAsset(MannyMesh.Object);
+	if (MannyAnim.Succeeded()) GetMesh()->SetAnimInstanceClass(MannyAnim.Class);
+	DefaultMappingContext = IMC.Object;
+	MoveAction = IAMove.Object;
+	LookAction = IALook.Object;
+	JumpAction = IAJump.Object;
+	CameraMode->ToggleAction = IAView.Object;
+	Carry->InteractAction = IAInteract.Object;
+	Carry->UseAction = IAUse.Object;
+	Carry->PetAction = IAPet.Object;
+}
+
+void AFVFamilyCharacter::ApplyMemberData(UFVFamilyMemberData* Member)
+{
+	MemberData = Member;
+	if (!MemberData)
+	{
+		return;
+	}
+	GetCharacterMovement()->MaxWalkSpeed = MemberData->WalkSpeed;
+	CameraMode->FirstPersonEyeOffset.Z = MemberData->FirstPersonEyeHeight;
+	if (!MetaHumanActor && !MemberData->MetaHumanClass.IsNull())
+	{
+		FVMetaHuman::UseAnimFrame(this, MemberData->bFemaleFrame);
+		MetaHumanActor = FVMetaHuman::AttachTo(this, MemberData->MetaHumanClass.LoadSynchronous());
+	}
 }
 
 void AFVFamilyCharacter::BeginPlay()
@@ -55,9 +99,23 @@ void AFVFamilyCharacter::BeginPlay()
 	Super::BeginPlay();
 	if (MemberData)
 	{
-		GetCharacterMovement()->MaxWalkSpeed = MemberData->WalkSpeed;
-		CameraMode->FirstPersonEyeOffset.Z = MemberData->FirstPersonEyeHeight;
+		ApplyMemberData(MemberData);
 	}
+}
+
+void AFVFamilyCharacter::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (MetaHumanActor)
+	{
+		MetaHumanActor->Destroy();
+		MetaHumanActor = nullptr;
+	}
+	Super::EndPlay(Reason);
+}
+
+void AFVFamilyCharacter::NotifyControllerChanged()
+{
+	Super::NotifyControllerChanged();
 	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Sub = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))

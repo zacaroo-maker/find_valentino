@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
+#include "FVMetaHuman.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -104,6 +105,8 @@ void UFVCameraModeComponent::ApplyMovementStyle()
 			Mesh->UnHideBoneByName(HeadBoneName);
 		}
 	}
+	// a MetaHuman's head is separate meshes and grooms, so hide those too
+	FVMetaHuman::SetHeadHidden(OwnerCharacter, bFP);
 }
 
 void UFVCameraModeComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
