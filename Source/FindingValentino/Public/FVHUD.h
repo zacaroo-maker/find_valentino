@@ -18,6 +18,7 @@ public:
 
 private:
 	void DrawPauseMenu();
+	void DrawDaySummary();
 	void DrawPrompt(const FText& Text, float Y, const FLinearColor& TextColor);
 	void DrawToast(const FText& Text, float Y);
 	/** Pixel block size for this screen (same scale as the start screen). */

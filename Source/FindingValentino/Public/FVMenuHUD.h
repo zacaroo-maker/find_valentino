@@ -79,6 +79,10 @@ private:
 	void SetCursor(int32 NewCursor);
 	FRotator CameraBase = FRotator::ZeroRotator;
 
+	/** From the save: best day (HI-SCORE) and the last day played (1UP). */
+	int32 SavedHighScore = 0;
+	int32 SavedLastScore = 0;
+
 	bool bPixelApplied = false;
 	float SavedScreenPercentage = 100.f;
 	int32 SavedAA = 4;

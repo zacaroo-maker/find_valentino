@@ -8,6 +8,7 @@
 #include "FVGameInstance.h"
 #include "FVPixelArt.h"
 #include "FVAudio.h"
+#include "FVSaveGame.h"
 #include "Components/AudioComponent.h"
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/PlayerController.h"
@@ -106,6 +107,11 @@ void AFVMenuHUD::BeginPlay()
 	}
 	ApplyPixelLook(bPixelLook);
 	StartMusic();
+	if (const UFVSaveGame* Save = UFVSaveGame::Load())
+	{
+		SavedHighScore = Save->HighScore;
+		SavedLastScore = Save->LastScore;
+	}
 }
 
 void AFVMenuHUD::StartMusic()
@@ -207,6 +213,10 @@ void AFVMenuHUD::StartGame()
 	if (GI && Family.IsValidIndex(Selected))
 	{
 		GI->SelectedMember = Family[Selected];
+	}
+	if (GI)
+	{
+		GI->DayNumber = 1; // a new game starts on day one
 	}
 	ApplyPixelLook(false);
 	FVAudio::Play2D(this, EFVSound::UIStart, 0.6f, 1.f, true); // the fanfare carries on into the garden
@@ -374,9 +384,9 @@ void AFVMenuHUD::DrawTopBar()
 	const float S = FMath::Max(2.f, FMath::RoundToFloat(P * 0.6f));
 	const float Y = 3.f * S;
 	FVPixel::DrawText(this, TEXT("1UP"), CW * 0.05f, Y, S, Red);
-	FVPixel::DrawText(this, TEXT("000000"), CW * 0.05f, Y + 9.f * S, S, White);
+	FVPixel::DrawText(this, FString::Printf(TEXT("%06d"), SavedLastScore), CW * 0.05f, Y + 9.f * S, S, White);
 	FVPixel::DrawTextCentred(this, TEXT("HI-SCORE"), CW * 0.5f, Y, S, Red);
-	FVPixel::DrawTextCentred(this, TEXT("010000"), CW * 0.5f, Y + 9.f * S, S, White);
+	FVPixel::DrawTextCentred(this, FString::Printf(TEXT("%06d"), SavedHighScore), CW * 0.5f, Y + 9.f * S, S, White);
 	const FString Credit = TEXT("CREDIT 01");
 	FVPixel::DrawText(this, Credit, CW * 0.95f - FVPixel::TextWidth(Credit, S), Y, S, Cyan);
 }

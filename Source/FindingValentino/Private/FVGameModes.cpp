@@ -10,6 +10,7 @@
 #include "FVHUD.h"
 #include "FVAudio.h"
 #include "FVWeather.h"
+#include "FVDay.h"
 #include "Engine/World.h"
 #include "FVMenuHUD.h"
 #include "Components/CapsuleComponent.h"
@@ -58,6 +59,12 @@ void AFVGameMode::BeginPlay()
 	}
 	if (!bMenuMode)
 	{
+		// a day in the garden begins
+		if (UFVDaySubsystem* DayDirector = GetWorld()->GetSubsystem<UFVDaySubsystem>())
+		{
+			const UFVGameInstance* GI = Cast<UFVGameInstance>(GetGameInstance());
+			DayDirector->StartDay(GI ? GI->DayNumber : 1);
+		}
 		return;
 	}
 	// look at the garden through the camera tagged "MenuCamera"
@@ -188,8 +195,44 @@ void AFVPlayerController::Weather(int32 Index)
 	}
 }
 
+void AFVPlayerController::SkipTime(float Hours)
+{
+	if (UFVDaySubsystem* D = GetWorld()->GetSubsystem<UFVDaySubsystem>())
+	{
+		D->SkipHours(Hours);
+	}
+}
+
+void AFVPlayerController::ShowDaySummary()
+{
+	bSummaryOpen = true;
+	bMenuOpen = false;
+	SetPause(true);
+	bShowMouseCursor = true;
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
+	FInputModeGameAndUI Mode;
+	Mode.SetHideCursorDuringCapture(false);
+	SetInputMode(Mode);
+}
+
+void AFVPlayerController::NextDay()
+{
+	SetPause(false);
+	UFVGameInstance* GI = Cast<UFVGameInstance>(GetGameInstance());
+	if (GI)
+	{
+		++GI->DayNumber;
+	}
+	UGameplayStatics::OpenLevel(this, GI ? GI->GameLevel : FName(TEXT("L_Backyard")));
+}
+
 void AFVPlayerController::TogglePauseMenu()
 {
+	if (bSummaryOpen)
+	{
+		return; // the day summary has its own buttons
+	}
 	bMenuOpen = !bMenuOpen;
 	FVAudio::Play2D(this, EFVSound::UIPause, 0.6f, bMenuOpen ? 1.f : 0.85f);
 	SetPause(bMenuOpen);

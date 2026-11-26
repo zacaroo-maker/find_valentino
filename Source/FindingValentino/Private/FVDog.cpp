@@ -86,6 +86,7 @@ bool AFVDog::Pet()
 		return false;
 	}
 	PetCooldown = 0.5f;
+	++TimesPetted;
 	Energy = FMath::Clamp(Energy + PetEnergy, 0.f, 1.f);
 	HappyTimeLeft = 4.f;
 	ThoughtTimeLeft = 0.f; // react right away

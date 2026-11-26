@@ -66,6 +66,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Dog")
 	FText GetThought() const { return Thought; }
 
+	/** Pats received (for the day's goals). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dog")
+	int32 TimesPetted = 0;
+
 	/** Show this dog's energy meter on the HUD (Diego yes, the dogs at the park no). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dog")
 	bool bShowMeter = true;

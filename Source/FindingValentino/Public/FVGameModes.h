@@ -71,6 +71,15 @@ public:
 	/** Console: "Weather 0".."Weather 4" = cool morning, mild, warm spring, hot summer, cloudy & breezy. */
 	UFUNCTION(Exec)
 	void Weather(int32 Index);
+	/** Console: "SkipTime 3" jumps the day's clock forward 3 hours (testing). */
+	UFUNCTION(Exec)
+	void SkipTime(float Hours);
+
+	/** End of the day: pause and show the summary (NEXT DAY / MAIN MENU). */
+	void ShowDaySummary();
+	UFUNCTION(BlueprintCallable, Category = "Day")
+	void NextDay();
+	bool IsSummaryOpen() const { return bSummaryOpen; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -80,5 +89,6 @@ protected:
 
 private:
 	bool bMenuOpen = false;
+	bool bSummaryOpen = false;
 	FFVFootsteps Footsteps;
 };

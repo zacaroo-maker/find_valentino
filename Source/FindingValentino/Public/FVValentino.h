@@ -121,6 +121,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Valentino")
 	bool IsHot() const { return Temperature >= HotTemperature; }
 
+	/** How many times he has eaten today, and what he ate last (for the day's goals). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
+	int32 TimesEaten = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
+	EFVFoodType LastFood = EFVFoodType::Lettuce;
+
 	/** Current behaviour, set by the AI controller (shown for debugging). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino")
 	EFVValentinoState State = EFVValentinoState::Wander;

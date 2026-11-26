@@ -11,6 +11,7 @@
 #include "FVPixelArt.h"
 #include "FVAudio.h"
 #include "FVWeather.h"
+#include "FVDay.h"
 #include "FVValentino.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -74,6 +75,74 @@ void AFVHUD::DrawPauseMenu()
 	FVPixel::DrawScanlines(this, CW, CH, FMath::Max(3.f, FMath::RoundToFloat(P * 0.5f)), 0.14f);
 }
 
+void AFVHUD::DrawDaySummary()
+{
+	const UFVDaySubsystem* D = GetWorld()->GetSubsystem<UFVDaySubsystem>();
+	if (!D)
+	{
+		return;
+	}
+	const float CW = Canvas->ClipX, CH = Canvas->ClipY;
+	const float P = Px();
+	const float S = FMath::Max(2.f, FMath::RoundToFloat(P * 0.7f));
+	const float T = GetWorld()->GetRealTimeSeconds();
+	DrawRect(FLinearColor(0.02f, 0.f, 0.08f, 0.7f), 0.f, 0.f, CW, CH);
+	const float H2 = FMath::RoundToFloat(P * 2.f);
+	FVPixel::DrawTextCentred(this, FString::Printf(TEXT("DAY %d COMPLETE"), D->GetDay()), CW * 0.5f, CH * 0.1f, H2, White, &SunsetRows(),
+		FMath::RoundToFloat(H2 * 0.45f), ShadowPurple);
+
+	// the day's points, by kind
+	const auto& Lines = D->GetSummaryLines();
+	const float BoxW = FMath::Min(CW * 0.6f, 70.f * 6.f * S);
+	const float BoxX = (CW - BoxW) * 0.5f;
+	const float BoxY = CH * 0.28f;
+	const float BoxH = 6.f * S + (Lines.Num() + 2) * 11.f * S + 4.f * S;
+	FVPixel::DrawBox(this, BoxX, BoxY, BoxW, BoxH, S * 0.75f, Ink, Cyan);
+	float Y = BoxY + 5.f * S;
+	for (const auto& L : Lines)
+	{
+		FVPixel::DrawText(this, L.Key, BoxX + 5.f * S, Y, S, L.Value > 0 ? White : FLinearColor(1.f, 0.55f, 0.4f));
+		const FString V = FString::Printf(TEXT("%d"), L.Value);
+		FVPixel::DrawText(this, V, BoxX + BoxW - 5.f * S - FVPixel::TextWidth(V, S), Y, S, Yellow);
+		Y += 11.f * S;
+	}
+	DrawRect(Cyan, BoxX + 5.f * S, Y + 2.f * S, BoxW - 10.f * S, S * 0.5f);
+	Y += 6.f * S;
+	FVPixel::DrawText(this, TEXT("TOTAL"), BoxX + 5.f * S, Y, S * 1.2f, Yellow);
+	const FString Tot = FString::Printf(TEXT("%06d"), D->GetScore());
+	FVPixel::DrawText(this, Tot, BoxX + BoxW - 5.f * S - FVPixel::TextWidth(Tot, S * 1.2f), Y, S * 1.2f, Yellow, nullptr, S * 0.5f, ShadowPurple);
+
+	Y = BoxY + BoxH + 4.f * S;
+	if (D->IsNewHighScore())
+	{
+		if (FMath::Fmod(T, 0.8f) < 0.5f)
+		{
+			FVPixel::DrawTextCentred(this, TEXT("NEW HI-SCORE!"), CW * 0.5f, Y, S * 1.6f, Red, nullptr, S * 0.6f, ShadowPurple);
+		}
+	}
+	else
+	{
+		FVPixel::DrawTextCentred(this, FString::Printf(TEXT("HI-SCORE %06d"), D->GetHighScore()), CW * 0.5f, Y, S * 1.2f, FLinearColor(0.6f, 0.6f, 0.7f));
+	}
+
+	// NEXT DAY / MAIN MENU
+	const TPair<const TCHAR*, FName> Buttons[] = {{TEXT("NEXT DAY"), TEXT("NextDay")}, {TEXT("MAIN MENU"), TEXT("MainMenu")}};
+	const float BW = FVPixel::TextWidth(TEXT("MAIN MENU"), P) + 12.f * P;
+	const float BH = 11.f * P;
+	float BX = CW * 0.5f - BW - 3.f * P;
+	const float BY = Y + 14.f * S;
+	for (const auto& B : Buttons)
+	{
+		const bool bSel = Hover == B.Value;
+		const float Bounce = bSel ? -FMath::Abs(FMath::Sin(T * 9.f)) * P : 0.f;
+		FVPixel::DrawBox(this, BX, BY + Bounce, BW, BH, P, bSel ? Magenta : Ink, bSel ? Yellow : Cyan);
+		FVPixel::DrawTextCentred(this, B.Key, BX + BW * 0.5f, BY + Bounce + 2.f * P, P, bSel ? Yellow : White, nullptr, P * 0.5f, ShadowPurple);
+		AddHitBox(FVector2D(BX, BY), FVector2D(BW, BH), B.Value, true);
+		BX += BW + 6.f * P;
+	}
+	FVPixel::DrawScanlines(this, CW, CH, FMath::Max(3.f, FMath::RoundToFloat(P * 0.5f)), 0.14f);
+}
+
 void AFVHUD::NotifyHitBoxBeginCursorOver(FName BoxName)
 {
 	if (BoxName != Hover)
@@ -95,6 +164,10 @@ void AFVHUD::NotifyHitBoxClick(FName BoxName)
 	else if (BoxName == TEXT("MainMenu") && PC)
 	{
 		PC->GoToMainMenu();
+	}
+	else if (BoxName == TEXT("NextDay") && PC)
+	{
+		PC->NextDay();
 	}
 	else if (BoxName == TEXT("Quit"))
 	{
@@ -160,6 +233,11 @@ void AFVHUD::DrawHUD()
 	}
 	if (const AFVPlayerController* FPC = Cast<AFVPlayerController>(GetOwningPlayerController()))
 	{
+		if (FPC->IsSummaryOpen())
+		{
+			DrawDaySummary();
+			return;
+		}
 		if (FPC->IsPauseMenuOpen())
 		{
 			DrawPauseMenu();
@@ -233,8 +311,70 @@ void AFVHUD::DrawHUD()
 		});
 	}
 
-	// keep thought bubbles clear of the meters panel
-	const float PanelRight = X + PanelW;
+	// ---- the day: TO DO list under the meters ----
+	const UFVDaySubsystem* DayDir = GetWorld()->GetSubsystem<UFVDaySubsystem>();
+	float ListW = PanelW;
+	if (DayDir && DayDir->IsRunning() && DayDir->GetGoals().Num() > 0)
+	{
+		TArray<FString> Lines;
+		for (const FFVGoal& G : DayDir->GetGoals())
+		{
+			FString L = G.Text;
+			if (G.Needed > 0.f)
+			{
+				L += FString::Printf(TEXT(" %d/%d"), FMath::Min(FMath::FloorToInt(G.Progress), FMath::RoundToInt(G.Needed)), FMath::RoundToInt(G.Needed));
+			}
+			Lines.Add(L);
+			ListW = FMath::Max(ListW, 4.f * S + 9.f * S + FVPixel::TextWidth(L, S) + 4.f * S);
+		}
+		const float H = 4.f * S + 9.f * S + Lines.Num() * 10.f * S + 2.f * S;
+		FVPixel::DrawBox(this, X, Y, ListW, H, S * 0.75f, Ink, Cyan);
+		FVPixel::DrawText(this, TEXT("TO DO"), X + 4.f * S, Y + 3.f * S, S, Yellow, nullptr, S * 0.4f, ShadowPurple);
+		float LY = Y + 3.f * S + 10.f * S;
+		for (const FString& L : Lines)
+		{
+			// a little blinking arrow in front of each task
+			FVPixel::DrawText(this, TEXT(">"), X + 4.f * S, LY, S, FMath::Fmod(T, 1.f) < 0.6f ? Yellow : Cyan);
+			FVPixel::DrawText(this, L, X + 4.f * S + 9.f * S, LY, S, White);
+			LY += 10.f * S;
+		}
+		Y += H + 2.f * S;
+	}
+
+	// ---- clock and score (top centre) ----
+	if (DayDir && DayDir->IsRunning())
+	{
+		const FString Clock = FString::Printf(TEXT("DAY %d  %s"), DayDir->GetDay(), *DayDir->GetClockText());
+		const FString Sc = FString::Printf(TEXT("SCORE %06d"), DayDir->GetScore());
+		const float BW = FMath::Max(FVPixel::TextWidth(Clock, S), FVPixel::TextWidth(Sc, S)) + 8.f * S;
+		const float BH = 4.f * S + 7.f * S + 3.f * S + 7.f * S + 3.f * S;
+		const float BX = (Canvas->ClipX - BW) * 0.5f;
+		FVPixel::DrawBox(this, BX, 4.f * P, BW, BH, S * 0.75f, Ink, Cyan);
+		FVPixel::DrawTextCentred(this, Clock, Canvas->ClipX * 0.5f, 4.f * P + 4.f * S, S, DayDir->GetHour() >= DayDir->BedtimeHour ? FLinearColor(1.f, 0.55f, 0.2f) : Cyan);
+		FVPixel::DrawTextCentred(this, Sc, Canvas->ClipX * 0.5f, 4.f * P + 14.f * S, S, Yellow, nullptr, S * 0.4f, ShadowPurple);
+
+		// points popping up and floating away
+		float PY = CH * 0.3f;
+		for (const FFVPopup& Pop : DayDir->GetPopups())
+		{
+			const float A = FMath::Clamp(2.6f - Pop.Age, 0.f, 1.f);
+			const float Size = (Pop.bBig ? 1.3f : 1.f) * S;
+			const float Rise = Pop.Age * 12.f * S;
+			FVPixel::DrawTextCentred(this, Pop.Text, Canvas->ClipX * 0.5f, PY - Rise, Size, FLinearColor(1.f, 0.9f, 0.2f, A), nullptr,
+				Size * 0.45f, FLinearColor(0.22f, 0.03f, 0.35f, A));
+			PY += 10.f * Size;
+		}
+		// big announcements ("DAY 2", "BEDTIME!")
+		const FString Banner = DayDir->GetBanner();
+		if (!Banner.IsEmpty())
+		{
+			const float BP = FMath::RoundToFloat(P * 2.2f);
+			FVPixel::DrawTextCentred(this, Banner, Canvas->ClipX * 0.5f, CH * 0.18f, BP, White, &SunsetRows(), FMath::RoundToFloat(BP * 0.45f), ShadowPurple);
+		}
+	}
+
+	// keep thought bubbles clear of the meters and list
+	const float PanelRight = X + ListW;
 	const float PanelBottom = Y;
 
 	// ---- today's weather (top-right): a little sun or cloud, the name and the temperature ----

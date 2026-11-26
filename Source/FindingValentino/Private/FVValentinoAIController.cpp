@@ -1,5 +1,6 @@
 #include "FVValentinoAIController.h"
 
+#include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
 #include "FVAudio.h"
 #include "FVCarryComponent.h"
@@ -165,6 +166,61 @@ bool AFVValentinoAIController::StartGoingToHide()
 	return true;
 }
 
+void AFVValentinoAIController::HideAtRandomSpot()
+{
+	if (!Tortoise)
+	{
+		return;
+	}
+	TArray<AFVHidingSpot*> Spots;
+	for (TActorIterator<AFVHidingSpot> It(GetWorld()); It; ++It)
+	{
+		if (!It->bOccupied)
+		{
+			Spots.Add(*It);
+		}
+	}
+	if (Spots.Num() == 0)
+	{
+		return;
+	}
+	ReleaseHidingSpot();
+	CurrentSpot = Spots[FMath::RandHelper(Spots.Num())];
+	CurrentSpot->bOccupied = true;
+	StopMovement();
+	const float Half = Tortoise->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	Tortoise->SetActorLocation(CurrentSpot->GetActorLocation() + FVector(0.f, 0.f, Half + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
+	Tortoise->SetActorRotation(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
+	SetState(EFVValentinoState::Hiding);
+	bHideUntilFound = true;
+	StateTimeLeft = 1.e6f;
+}
+
+void AFVValentinoAIController::StopHiding()
+{
+	bHideUntilFound = false;
+	if (State == EFVValentinoState::Hiding || State == EFVValentinoState::GoingToHide)
+	{
+		ReleaseHidingSpot();
+		StartRest();
+		StateTimeLeft = FMath::RandRange(3.f, 6.f);
+	}
+}
+
+void AFVValentinoAIController::SetAsleep(bool bSleep)
+{
+	bAsleep = bSleep;
+	if (Tortoise)
+	{
+		StopMovement();
+		Tortoise->SetRetracted(bSleep);
+	}
+	if (!bSleep)
+	{
+		StartRest();
+	}
+}
+
 void AFVValentinoAIController::ReleaseHidingSpot()
 {
 	if (CurrentSpot)
@@ -214,6 +270,8 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 	// --- Being carried: the person holding him is in charge ---
 	if (Tortoise->IsHeld())
 	{
+		bAsleep = false; // lifting him wakes him up
+		bHideUntilFound = false;
 		if (State != EFVValentinoState::Held)
 		{
 			StopMovement();
@@ -246,6 +304,16 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 		StartRest();
 		StateTimeLeft = FMath::RandRange(2.f, 4.f);
 		ApproachCooldown = 6.f;
+	}
+
+	// --- Asleep for the night (or hidden waiting to be found): nothing to do ---
+	if (bAsleep)
+	{
+		return;
+	}
+	if (bHideUntilFound)
+	{
+		return; // the day's director calls StopHiding() when he's found
 	}
 
 	StateTimeLeft -= DeltaSeconds;

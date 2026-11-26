@@ -14,7 +14,8 @@ AFVValentino::AFVValentino()
 
 	// Small body: ~25 cm long, ~9 cm tall
 	GetCapsuleComponent()->InitCapsuleSize(9.f, 9.f);
-	GetMesh()->SetRelativeLocation(FVector(0, 0, -9.f));
+	// the movement component keeps the capsule ~2 cm above the floor; sink the mesh by that so his feet touch the ground
+	GetMesh()->SetRelativeLocation(FVector(0, 0, -11.2f));
 	GetMesh()->SetRelativeRotation(FRotator(0, 270.f, 0)); // model faces +Y, actor forward is +X
 	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 
@@ -117,6 +118,8 @@ bool AFVValentino::Eat(EFVFoodType Food, float EnergyValue)
 	}
 	Energy = FMath::Clamp(Energy + EnergyValue, 0.f, 1.f);
 	EatTimeLeft = 3.5f;
+	++TimesEaten;
+	LastFood = Food;
 	// three crunchy bites while he eats
 	for (int32 k = 0; k < 3; ++k)
 	{

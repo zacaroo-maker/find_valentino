@@ -65,6 +65,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Valentino")
 	EFVValentinoState GetState() const { return State; }
 
+	/** Start of the day: he's already tucked away in a random hiding spot and stays there until found. */
+	void HideAtRandomSpot();
+	/** Found him: come out of hiding and carry on with the day. */
+	void StopHiding();
+	/** Bedtime: tucked into his shell and asleep (picking him up wakes him). */
+	void SetAsleep(bool bSleep);
+	bool IsAsleep() const { return bAsleep; }
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -92,4 +100,7 @@ private:
 	float ThinkCooldown = 0.f;
 	float ApproachCooldown = 0.f;
 	bool bMoveDone = false;
+	bool bAsleep = false;
+	/** Morning hide: stay put until found, however long it takes. */
+	bool bHideUntilFound = false;
 };

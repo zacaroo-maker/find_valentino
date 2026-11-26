@@ -23,6 +23,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
 	bool bMusicOn = true;
 
+	/** Which day of the garden we're on (NEXT DAY counts up; a new game from the menu starts at 1). */
+	UPROPERTY(BlueprintReadWrite, Category = "Day")
+	int32 DayNumber = 1;
+
 	/** The garden level. The main menu is this same level opened with "?Menu". */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Family")
 	FName GameLevel = TEXT("L_Backyard");
