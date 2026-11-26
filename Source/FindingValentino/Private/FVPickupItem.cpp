@@ -1,4 +1,4 @@
-#include "FVPickupItem.h"
+﻿#include "FVPickupItem.h"
 
 #include "Components/StaticMeshComponent.h"
 
@@ -58,7 +58,7 @@ void AFVPickupItem::PrepareForPickup()
 {
 	RestRotation = GetActorRotation();
 	FVector Origin, Extent;
-	GetActorBounds(true, Origin, Extent);
+	Origin = Mesh->Bounds.Origin; Extent = Mesh->Bounds.BoxExtent; // own mesh only
 	RestHalfExtent = Extent;
 	BottomOffset = GetActorLocation().Z - (Origin.Z - Extent.Z);
 }
@@ -98,3 +98,5 @@ void AFVPickupItem::SetPouring(bool bPour)
 		SetActorRelativeRotation(FRotator(RestRotation.Pitch + (bPouring ? -35.f : 0.f), HeldRelYaw, RestRotation.Roll));
 	}
 }
+
+

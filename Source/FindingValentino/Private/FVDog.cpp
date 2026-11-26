@@ -10,9 +10,9 @@ AFVDog::AFVDog()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// small dog: ~45 cm tall, ~55 cm long
-	GetCapsuleComponent()->InitCapsuleSize(22.f, 24.f);
-	GetMesh()->SetRelativeLocation(FVector(0, 0, -24.f));
+	// small dog: ~43 cm tall, ~68 cm long incl. tail
+	GetCapsuleComponent()->InitCapsuleSize(20.f, 22.f);
+	GetMesh()->SetRelativeLocation(FVector(0, 0, -22.f));
 	GetMesh()->SetRelativeRotation(FRotator(0, 270.f, 0)); // model faces +Y, actor forward is +X
 	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 

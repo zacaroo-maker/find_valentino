@@ -1,4 +1,4 @@
-#include "FVCarryComponent.h"
+﻿#include "FVCarryComponent.h"
 
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -108,6 +108,17 @@ AFVPickupItem* UFVCarryComponent::FindReachableItem(float& OutDist) const
 	const FVector ViewDir = GetViewDir2D();
 	const float CosLimit = FMath::Cos(FMath::DegreesToRadians(ReachHalfAngleDeg + 10.f));
 	const FVector P = Owner->GetActorLocation();
+	// full 3D view direction from the eyes, to pick what the player is actually aiming at
+	FVector View3D = Owner->GetActorForwardVector();
+	if (const APawn* Pawn = Cast<APawn>(Owner))
+	{
+		if (const AController* C = Pawn->GetController())
+		{
+			View3D = C->GetControlRotation().Vector();
+		}
+	}
+	const FVector Eye = P + FVector(0, 0, 60.f);
+	float BestAim = -2.f;
 	AFVPickupItem* Best = nullptr;
 	for (TActorIterator<AFVPickupItem> It(GetWorld()); It; ++It)
 	{
@@ -117,7 +128,7 @@ AFVPickupItem* UFVCarryComponent::FindReachableItem(float& OutDist) const
 			continue;
 		}
 		FVector O, E;
-		I->GetActorBounds(true, O, E);
+		O = I->Mesh->Bounds.Origin; E = I->Mesh->Bounds.BoxExtent; // the item's own mesh (food has no collision; ignore the can's water stream)
 		// distance (2D) from us to the nearest edge of the item, so big things like benches work from either end
 		const FVector2D Near(FMath::Clamp(P.X, O.X - E.X, O.X + E.X), FMath::Clamp(P.Y, O.Y - E.Y, O.Y + E.Y));
 		const float Dist = FVector2D::Distance(FVector2D(P), Near);
@@ -127,8 +138,16 @@ AFVPickupItem* UFVCarryComponent::FindReachableItem(float& OutDist) const
 		}
 		const FVector To = FVector(Near.X - P.X, Near.Y - P.Y, 0.f);
 		const bool bInView = To.IsNearlyZero(5.f) || FVector::DotProduct(ViewDir, To.GetSafeNormal()) >= CosLimit;
-		if ((bInView || Dist < 40.f) && Dist < OutDist)
+		if (!(bInView || Dist < 40.f))
 		{
+			continue;
+		}
+		// aim score: how close the item (its nearest point, at its own height) is to the centre of view
+		const FVector AimPoint(Near.X, Near.Y, FMath::Clamp(Eye.Z, O.Z - E.Z, O.Z + E.Z));
+		const float Aim = FVector::DotProduct(View3D, (AimPoint - Eye).GetSafeNormal());
+		if (Aim > BestAim)
+		{
+			BestAim = Aim;
 			Best = I;
 			OutDist = Dist;
 		}
@@ -189,6 +208,25 @@ bool UFVCarryComponent::FindItemDrop(FVector& OutGround, float& OutYaw) const
 	const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
 		OutGround + FVector(0, 0, Half.Z + 3.f), FQuat::Identity, ECC_Pawn, FCollisionShape::MakeBox(Box), Params);
 	return !bBlocked;
+}
+
+bool UFVCarryComponent::PreferValentino(const AFVValentino* V, const AFVPickupItem* Item) const
+{
+	// whichever is closer to the centre of the view wins (uses the camera pitch too, so looking down at
+	// a dandelion next to Valentino picks the dandelion)
+	const AActor* Owner = GetOwner();
+	FVector View = Owner->GetActorForwardVector();
+	if (const APawn* P = Cast<APawn>(Owner))
+	{
+		if (const AController* C = P->GetController())
+		{
+			View = C->GetControlRotation().Vector();
+		}
+	}
+	FVector Eye = Owner->GetActorLocation() + FVector(0, 0, 60.f);
+	const float DV = FVector::DotProduct(View, (V->GetActorLocation() - Eye).GetSafeNormal());
+	const float DI = FVector::DotProduct(View, (Item->GetActorLocation() - Eye).GetSafeNormal());
+	return DV >= DI;
 }
 
 AFVPond* UFVCarryComponent::FindNearbyPond() const
@@ -253,12 +291,11 @@ void UFVCarryComponent::Interact()
 		}
 		return;
 	}
-	// 3) hands free -> pick up whichever is closer: Valentino or an item
+	// 3) hands free -> pick up whatever you're looking at most directly: Valentino or an item
 	float ItemDist;
 	AFVPickupItem* Item = FindReachableItem(ItemDist);
 	AFVValentino* V = FindReachableValentino();
-	const float VDist = V ? FVector::Dist2D(V->GetActorLocation(), Owner->GetActorLocation()) : TNumericLimits<float>::Max();
-	if (V && (!Item || VDist <= ItemDist + 20.f))
+	if (V && (!Item || PreferValentino(V, Item)))
 	{
 		Carried = V;
 		V->PickUp(Owner, CarryOffset);
@@ -270,7 +307,8 @@ void UFVCarryComponent::Interact()
 		const float Size = FMath::Max(Half.X, Half.Y);
 		// hold small things at the hands, big things (benches) further out and lower
 		const FVector Rel(30.f + Size, Item->Kind == EFVItemKind::WateringCan ? 22.f : 0.f, FMath::Clamp(15.f - Half.Z, -55.f, 10.f));
-		const float RelYaw = FRotator::NormalizeAxis(Item->GetRestYaw() - Owner->GetActorRotation().Yaw);
+		// the watering can is always held spout-forward; other things keep the way they were facing
+		const float RelYaw = Item->Kind == EFVItemKind::WateringCan ? 0.f : FRotator::NormalizeAxis(Item->GetRestYaw() - Owner->GetActorRotation().Yaw);
 		Item->AttachToHolder(Owner, Rel, RelYaw);
 		HeldItem = Item;
 	}
@@ -378,8 +416,7 @@ void UFVCarryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 			CandidateItem = FindReachableItem(ItemDist);
 			if (CandidateValentino && CandidateItem)
 			{
-				const float VDist = FVector::Dist2D(CandidateValentino->GetActorLocation(), GetOwner()->GetActorLocation());
-				if (VDist <= ItemDist + 20.f)
+				if (PreferValentino(CandidateValentino, CandidateItem))
 				{
 					CandidateItem = nullptr;
 				}
@@ -434,3 +471,5 @@ void UFVCarryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 }
 
 #undef LOCTEXT_NAMESPACE
+
+

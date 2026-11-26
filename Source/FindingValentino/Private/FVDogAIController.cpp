@@ -21,8 +21,10 @@ void AFVDogAIController::OnPossess(APawn* InPawn)
 		Sun = *It;
 		break;
 	}
-	// start the game already snoozing somewhere warm
-	StartGoingToSun();
+	// sniff about briefly (navigation may still be building), then go and find the sun
+	WanderLegsLeft = 0;
+	StartSniff();
+	StateTimeLeft = 1.5f;
 }
 
 void AFVDogAIController::SetState(EFVDogState S)
@@ -63,7 +65,7 @@ bool AFVDogAIController::IsSunny(const FVector& GroundPoint) const
 			continue;
 		}
 		FVector O, E;
-		It->GetActorBounds(true, O, E);
+		It->GetActorBounds(false, O, E); // canopies have no collision, so include non-colliding parts
 		const float CanopyZ = O.Z + E.Z * 0.3f;
 		const float Up = CanopyZ - GroundPoint.Z;
 		if (Up <= 0.f)

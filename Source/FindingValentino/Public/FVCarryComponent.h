@@ -84,6 +84,7 @@ private:
 	bool FindValentinoDrop(FVector& OutLocation) const;
 	bool FindItemDrop(FVector& OutGround, float& OutYaw) const;
 	AFVPond* FindNearbyPond() const;
+	bool PreferValentino(const AFVValentino* V, const AFVPickupItem* Item) const;
 	FVector GetViewDir2D() const;
 
 	UPROPERTY(Transient)
