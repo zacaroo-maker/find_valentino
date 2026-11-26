@@ -18,5 +18,5 @@ Game assets (`Content/`) are not included: they contain third-party content (Fab
 - `Build.bat FindingValentinoEditor Win64 Development -Project=<path>\FindingValentino.uproject`
 
 ## Controls (prototype)
-WASD move Â· mouse look Â· Space jump Â· **V** first/third person Â· **E** pick up / put down / give food Â· **hold left mouse** pour the watering can
+WASD move - mouse look - Space jump - **V** first/third person - **E** pick up / put down / give food - **F** pet Diego - **hold left mouse** pour the watering can
 
