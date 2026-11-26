@@ -8,6 +8,7 @@
 #include "FVCarryComponent.h"
 #include "FVDog.h"
 #include "FVFamilyMemberData.h"
+#include "FVAudio.h"
 #include "FVMetaHuman.h"
 #include "FVPickupItem.h"
 #include "Animation/AnimInstance.h"

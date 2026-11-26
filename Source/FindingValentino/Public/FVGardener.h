@@ -49,4 +49,5 @@ private:
 	bool bWalking = false;
 	float PauseLeft = 2.f;
 	float WalkTime = 0.f;
+	float StepDistance = 0.f;
 };

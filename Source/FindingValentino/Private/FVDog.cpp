@@ -4,6 +4,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
+#include "FVAudio.h"
 #include "FVDogAIController.h"
 #include "FVValentino.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -39,6 +40,10 @@ void AFVDog::BeginPlay()
 {
 	Super::BeginPlay();
 	PlayAnim(IdleAnim, true);
+	if (!BarkSound)
+	{
+		BarkSound = FVAudio::Get(EFVSound::Bark);
+	}
 }
 
 void AFVDog::PlayAnim(UAnimSequence* Anim, bool bLoop, float Rate)
@@ -150,10 +155,11 @@ void AFVDog::Bark()
 	{
 		LaunchCharacter(FVector(0.f, 0.f, 150.f), false, false); // a little bounce with each bark
 	}
-	if (BarkSound)
+	// big dogs bark deeper, small ones yap higher
+	const float Pitch = FMath::Clamp(1.15f / FMath::Max(Size, 0.3f), 0.55f, 1.8f) * FMath::FRandRange(0.94f, 1.06f);
+	if (FVAudio::Enabled(this, EFVSound::Bark))
 	{
-		// big dogs bark deeper
-		UGameplayStatics::PlaySoundAtLocation(this, BarkSound, GetActorLocation(), 1.f, FMath::Clamp(1.2f / FMath::Max(Size, 0.3f), 0.6f, 1.8f));
+		FVAudio::PlayAt(this, EFVSound::Bark, GetActorLocation(), FMath::Clamp(0.6f + 0.25f * Size, 0.6f, 1.2f), Pitch);
 	}
 }
 

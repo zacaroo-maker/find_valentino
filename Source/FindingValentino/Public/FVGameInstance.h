@@ -17,6 +17,12 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Family")
 	TObjectPtr<UFVFamilyMemberData> SelectedMember;
 
+	/** SOUND / MUSIC switches from the settings screen. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+	bool bSoundOn = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+	bool bMusicOn = true;
+
 	/** The garden level. The main menu is this same level opened with "?Menu". */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Family")
 	FName GameLevel = TEXT("L_Backyard");

@@ -254,6 +254,66 @@ void FVPixel::DrawBox(AHUD* Hud, float X, float Y, float W, float H, float Px, c
 	Hud->DrawRect(Border, X + W - Px, Y + Px, Px, H - 2.f * Px);
 }
 
+void FVPixel::DrawDisc(AHUD* Hud, float CX, float CY, float Radius, float Px, const FLinearColor& Color)
+{
+	if (!Hud || Radius <= 0.f)
+	{
+		return;
+	}
+	Px = FMath::Max(1.f, Px);
+	// one rectangle per pixel row, widths snapped to the pixel grid for the chunky look
+	for (float DY = -Radius; DY < Radius; DY += Px)
+	{
+		const float Mid = DY + Px * 0.5f;
+		const float Half = FMath::Sqrt(FMath::Max(0.f, Radius * Radius - Mid * Mid));
+		const float HalfSnapped = FMath::RoundToFloat(Half / Px) * Px;
+		if (HalfSnapped > 0.f)
+		{
+			Hud->DrawRect(Color, FMath::RoundToFloat(CX - HalfSnapped), FMath::RoundToFloat(CY + DY), HalfSnapped * 2.f, Px);
+		}
+	}
+}
+
+void FVPixel::DrawThoughtCloud(AHUD* Hud, float X, float Y, float W, float H, float Px, const FLinearColor& Fill, const FLinearColor& Edge)
+{
+	if (!Hud)
+	{
+		return;
+	}
+	struct FCircle { float X, Y, R; };
+	TArray<FCircle> Circles;
+	const float R = H * 0.5f;
+	// body: a pill (two round ends joined by a box), filled with overlapping circles
+	const float Left = X + R, Right = X + W - R;
+	const int32 BodyCount = FMath::Max(2, FMath::CeilToInt((Right - Left) / (R * 0.8f)) + 1);
+	for (int32 i = 0; i < BodyCount; ++i)
+	{
+		Circles.Add({FMath::Lerp(Left, Right, i / float(BodyCount - 1)), Y + R, R});
+	}
+	// puffy bumps along the top and bottom edges
+	const int32 Bumps = FMath::Max(2, FMath::RoundToInt((Right - Left) / (H * 0.6f)) + 1);
+	for (int32 i = 0; i < Bumps; ++i)
+	{
+		const float BX = FMath::Lerp(Left, Right, i / float(FMath::Max(1, Bumps - 1)));
+		Circles.Add({BX, Y + H * 0.12f, H * 0.36f});
+		if (i < Bumps - 1)
+		{
+			const float BX2 = FMath::Lerp(Left, Right, (i + 0.5f) / float(FMath::Max(1, Bumps - 1)));
+			Circles.Add({BX2, Y + H * 0.9f, H * 0.3f});
+		}
+	}
+	// outline first (each circle a little bigger), then the white fill on top
+	const float Line = FMath::Max(Px, 2.f);
+	for (const FCircle& C : Circles)
+	{
+		DrawDisc(Hud, C.X, C.Y, C.R + Line, Px, Edge);
+	}
+	for (const FCircle& C : Circles)
+	{
+		DrawDisc(Hud, C.X, C.Y, C.R, Px, Fill);
+	}
+}
+
 void FVPixel::DrawScanlines(AHUD* Hud, float Width, float Height, float Spacing, float Alpha)
 {
 	if (!Hud || Spacing < 2.f)

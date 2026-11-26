@@ -1,6 +1,8 @@
 ﻿#include "FVPickupItem.h"
 
+#include "Components/AudioComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "FVAudio.h"
 
 AFVPickupItem::AFVPickupItem()
 {
@@ -92,6 +94,16 @@ void AFVPickupItem::SetPouring(bool bPour)
 	}
 	bPouring = bPour;
 	WaterStream->SetVisibility(bPouring);
+	// the sound of water pouring, from the spout
+	if (bPouring && !PourAudio)
+	{
+		PourAudio = FVAudio::PlayAttached(EFVSound::PourLoop, WaterStream, 0.6f);
+	}
+	else if (!bPouring && PourAudio)
+	{
+		PourAudio->FadeOut(0.25f, 0.f);
+		PourAudio = nullptr;
+	}
 	if (bHeld)
 	{
 		// tip the can forward while pouring

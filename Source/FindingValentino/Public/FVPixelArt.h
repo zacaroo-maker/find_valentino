@@ -29,6 +29,12 @@ namespace FVPixel
 	/** A chunky box: Fill with a Px-thick Border. */
 	FINDINGVALENTINO_API void DrawBox(AHUD* Hud, float X, float Y, float W, float H, float Px, const FLinearColor& Fill, const FLinearColor& Border);
 
+	/** A filled circle made of Px-sized steps. */
+	FINDINGVALENTINO_API void DrawDisc(AHUD* Hud, float CX, float CY, float Radius, float Px, const FLinearColor& Color);
+
+	/** A comic-book thought cloud (rounded, bumpy edge, outlined) around a W x H area at X,Y. */
+	FINDINGVALENTINO_API void DrawThoughtCloud(AHUD* Hud, float X, float Y, float W, float H, float Px, const FLinearColor& Fill, const FLinearColor& Edge);
+
 	/** CRT scanlines across the whole screen. */
 	FINDINGVALENTINO_API void DrawScanlines(AHUD* Hud, float Width, float Height, float Spacing, float Alpha);
 }

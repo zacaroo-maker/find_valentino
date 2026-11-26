@@ -2,6 +2,7 @@
 
 #include "Components/BillboardComponent.h"
 #include "EngineUtils.h"
+#include "FVAudio.h"
 #include "FVCarryComponent.h"
 #include "FVFoodSpawner.h"
 #include "Kismet/GameplayStatics.h"
@@ -44,6 +45,7 @@ bool AFVPlantBed::AddWater(float Seconds)
 			SproutTimeLeft = SproutDelay;
 		}
 		FVToast(GetWorld(), FText::Format(NSLOCTEXT("FV", "Watered", "The {0} is watered - something will grow soon!"), DisplayName));
+		FVAudio::PlayAt(this, EFVSound::PetChime, GetActorLocation(), 0.7f, 0.8f);
 		return true;
 	}
 	return false;
@@ -83,4 +85,5 @@ void AFVPlantBed::Sprout()
 		Spawner->SpawnFoodAtGround(SproutTypes[FMath::RandHelper(SproutTypes.Num())], P);
 	}
 	FVToast(GetWorld(), FText::Format(NSLOCTEXT("FV", "Sprouted", "Something new grew in the {0}!"), DisplayName));
+	FVAudio::PlayAt(this, EFVSound::Sprout, GetActorLocation(), 0.9f);
 }

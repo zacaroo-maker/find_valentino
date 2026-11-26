@@ -72,6 +72,11 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACameraActor> MenuCamera;
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> Music;
+	void StartMusic();
+	/** Moves the highlight and blips if it actually moved. */
+	void SetCursor(int32 NewCursor);
 	FRotator CameraBase = FRotator::ZeroRotator;
 
 	bool bPixelApplied = false;

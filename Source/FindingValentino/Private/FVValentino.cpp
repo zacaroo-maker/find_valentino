@@ -3,7 +3,9 @@
 #include "Animation/AnimSequence.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "FVAudio.h"
 #include "FVValentinoAIController.h"
+#include "TimerManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 AFVValentino::AFVValentino()
@@ -115,6 +117,19 @@ bool AFVValentino::Eat(EFVFoodType Food, float EnergyValue)
 	}
 	Energy = FMath::Clamp(Energy + EnergyValue, 0.f, 1.f);
 	EatTimeLeft = 3.5f;
+	// three crunchy bites while he eats
+	for (int32 k = 0; k < 3; ++k)
+	{
+		FTimerHandle H;
+		TWeakObjectPtr<AFVValentino> Self(this);
+		GetWorldTimerManager().SetTimer(H, [Self]()
+		{
+			if (Self.IsValid())
+			{
+				FVAudio::PlayAt(Self.Get(), EFVSound::Munch, Self->GetActorLocation(), 0.8f, FMath::FRandRange(0.9f, 1.1f));
+			}
+		}, 0.15f + k * 1.1f, false);
+	}
 	if (AController* C = GetController())
 	{
 		C->StopMovement();
@@ -126,6 +141,12 @@ bool AFVValentino::Eat(EFVFoodType Food, float EnergyValue)
 void AFVValentino::Drink(float Seconds)
 {
 	Thirst = FMath::Max(0.f, Thirst - Seconds * 0.08f);
+	SipTimer -= Seconds;
+	if (SipTimer <= 0.f)
+	{
+		SipTimer = 1.8f;
+		FVAudio::PlayAt(this, EFVSound::Sip, GetActorLocation(), 0.7f, FMath::FRandRange(0.95f, 1.1f));
+	}
 }
 
 void AFVValentino::PlayAnim(UAnimSequence* Anim, bool bLoop, float Rate)

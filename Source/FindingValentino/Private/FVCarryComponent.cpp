@@ -2,6 +2,7 @@
 
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
+#include "FVAudio.h"
 #include "EngineUtils.h"
 #include "FVDog.h"
 #include "FVPickupItem.h"
@@ -312,6 +313,11 @@ void UFVCarryComponent::Pet()
 	}
 	if (Dog && Dog->Pet())
 	{
+		FVAudio::PlayAt(this, EFVSound::PetChime, Dog->GetActorLocation(), 0.5f, FMath::FRandRange(0.95f, 1.1f));
+		if (FMath::FRand() < 0.3f)
+		{
+			Dog->Bark(); // a happy woof
+		}
 		++PetCount;
 		LastPetTime = GetWorld()->GetTimeSeconds();
 		LastPettedDog = Dog;
@@ -365,6 +371,7 @@ void UFVCarryComponent::Interact()
 		{
 			CarriedDog->PutDown(Drop, Owner->GetActorRotation().Yaw);
 			CarriedDog = nullptr;
+			FVAudio::PlayAt(this, EFVSound::PutDown, Drop, 0.6f);
 		}
 		return;
 	}
@@ -376,6 +383,7 @@ void UFVCarryComponent::Interact()
 		{
 			Carried->PutDown(Drop, Owner->GetActorRotation().Yaw);
 			Carried = nullptr;
+			FVAudio::PlayAt(this, EFVSound::PutDown, Drop, 0.5f, 1.2f);
 		}
 		return;
 	}
@@ -407,6 +415,7 @@ void UFVCarryComponent::Interact()
 			bUseHeld = false;
 			HeldItem->PlaceOnGround(Ground, Yaw);
 			HeldItem = nullptr;
+			FVAudio::PlayAt(this, EFVSound::PutDown, Ground, 0.7f);
 		}
 		return;
 	}
@@ -437,6 +446,10 @@ void UFVCarryComponent::Interact()
 		Item->AttachToHolder(Owner, Rel, RelYaw);
 		HeldItem = Item;
 	}
+	if (V || D || Item)
+	{
+		FVAudio::PlayAt(this, EFVSound::Pickup, Owner->GetActorLocation(), 0.6f, FMath::FRandRange(0.95f, 1.08f));
+	}
 	CandidateItem = nullptr;
 	CandidateValentino = nullptr;
 	CandidateDog = nullptr;
@@ -454,6 +467,7 @@ void UFVCarryComponent::UseStarted()
 		HeldItem->Water = HeldItem->WaterCapacity;
 		bUseHeld = false;
 		ShowToast(LOCTEXT("Refilled", "Watering can filled up at the pond."));
+		FVAudio::PlayAt(this, EFVSound::Splash, HeldItem->GetActorLocation(), 0.9f);
 		return;
 	}
 	if (HeldItem->Water <= 0.f)

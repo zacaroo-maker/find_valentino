@@ -13,7 +13,7 @@ class FINDINGVALENTINO_API AFVHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 	virtual void NotifyHitBoxClick(FName BoxName) override;
-	virtual void NotifyHitBoxBeginCursorOver(FName BoxName) override { Hover = BoxName; }
+	virtual void NotifyHitBoxBeginCursorOver(FName BoxName) override;
 	virtual void NotifyHitBoxEndCursorOver(FName BoxName) override { if (Hover == BoxName) { Hover = NAME_None; } }
 
 private:

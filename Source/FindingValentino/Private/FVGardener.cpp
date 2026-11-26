@@ -5,6 +5,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "EngineUtils.h"
+#include "FVAudio.h"
 #include "FVMetaHuman.h"
 #include "FVPlantBed.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -135,6 +136,14 @@ void AFVGardener::Tick(float DeltaSeconds)
 	if (bWalking)
 	{
 		WalkTime += DeltaSeconds;
+		// his footsteps, a little quieter
+		const float Speed = GetVelocity().Size2D();
+		StepDistance += Speed * DeltaSeconds;
+		if (Speed > 30.f && StepDistance >= 70.f)
+		{
+			StepDistance = 0.f;
+			FVAudio::PlayAt(this, EFVSound::Step, GetActorLocation() - FVector(0.f, 0.f, 90.f), 0.25f, FMath::FRandRange(0.8f, 0.95f));
+		}
 		const bool bArrived = AI->GetMoveStatus() == EPathFollowingStatus::Idle;
 		if (bArrived || WalkTime > 30.f)
 		{

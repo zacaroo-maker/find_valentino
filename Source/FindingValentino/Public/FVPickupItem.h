@@ -64,6 +64,8 @@ private:
 
 	bool bHeld = false;
 	bool bPouring = false;
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> PourAudio;
 	FRotator RestRotation = FRotator::ZeroRotator;
 	FVector RestHalfExtent = FVector(20.f);
 	float BottomOffset = 0.f;

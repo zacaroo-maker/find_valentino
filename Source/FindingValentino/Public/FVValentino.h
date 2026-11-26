@@ -140,4 +140,5 @@ private:
 	float HeldTime = 0.f;
 	float ShyTimeLeft = 0.f;
 	float EatTimeLeft = 0.f;
+	float SipTimer = 0.f;
 };

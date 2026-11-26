@@ -70,7 +70,10 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
+	/** Footsteps for whoever is being played. */
+	virtual void PlayerTick(float DeltaTime) override;
 
 private:
 	bool bMenuOpen = false;
+	float StepDistance = 0.f;
 };

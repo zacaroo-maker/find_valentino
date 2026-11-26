@@ -7,6 +7,8 @@
 #include "FVFamilyMemberData.h"
 #include "FVGameInstance.h"
 #include "FVPixelArt.h"
+#include "FVAudio.h"
+#include "Components/AudioComponent.h"
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
@@ -103,10 +105,33 @@ void AFVMenuHUD::BeginPlay()
 		}
 	}
 	ApplyPixelLook(bPixelLook);
+	StartMusic();
+}
+
+void AFVMenuHUD::StartMusic()
+{
+	if (!Music)
+	{
+		Music = FVAudio::Play2D(this, EFVSound::MenuMusic, 0.45f);
+	}
+}
+
+void AFVMenuHUD::SetCursor(int32 NewCursor)
+{
+	if (NewCursor != Cursor)
+	{
+		Cursor = NewCursor;
+		FVAudio::Play2D(this, EFVSound::UIMove, 0.35f);
+	}
 }
 
 void AFVMenuHUD::EndPlay(const EEndPlayReason::Type Reason)
 {
+	if (Music)
+	{
+		Music->Stop();
+		Music = nullptr;
+	}
 	ApplyPixelLook(false);
 	Super::EndPlay(Reason);
 }
@@ -149,7 +174,7 @@ int32 AFVMenuHUD::ItemCount() const
 	case EFVMenuScreen::Title: return 1;
 	case EFVMenuScreen::Main: return 4;
 	case EFVMenuScreen::Who: return Family.Num() + 2; // members, START!, BACK
-	case EFVMenuScreen::Settings: return 3;
+	case EFVMenuScreen::Settings: return 5;
 	}
 	return 1;
 }
@@ -163,6 +188,10 @@ void AFVMenuHUD::GoTo(EFVMenuScreen S, int32 StartCursor)
 
 void AFVMenuHUD::Back()
 {
+	if (Screen != EFVMenuScreen::Title)
+	{
+		FVAudio::Play2D(this, EFVSound::UIBack, 0.5f);
+	}
 	switch (Screen)
 	{
 	case EFVMenuScreen::Main: GoTo(EFVMenuScreen::Title); break;
@@ -180,11 +209,19 @@ void AFVMenuHUD::StartGame()
 		GI->SelectedMember = Family[Selected];
 	}
 	ApplyPixelLook(false);
+	FVAudio::Play2D(this, EFVSound::UIStart, 0.6f, 1.f, true); // the fanfare carries on into the garden
 	UGameplayStatics::OpenLevel(this, GI ? GI->GameLevel : FName(TEXT("L_Backyard")));
 }
 
 void AFVMenuHUD::Activate(int32 Index)
 {
+	// a confirming blip (START and BACK have their own sounds)
+	const bool bIsStart = (Screen == EFVMenuScreen::Main && Index == 0) || (Screen == EFVMenuScreen::Who && Index == Family.Num());
+	const bool bIsBack = (Screen == EFVMenuScreen::Who && Index == Family.Num() + 1) || (Screen == EFVMenuScreen::Settings && Index == 4);
+	if (!bIsStart && !bIsBack)
+	{
+		FVAudio::Play2D(this, EFVSound::UISelect, 0.5f);
+	}
 	switch (Screen)
 	{
 	case EFVMenuScreen::Title:
@@ -219,6 +256,29 @@ void AFVMenuHUD::Activate(int32 Index)
 			bPixelLook = !bPixelLook;
 			ApplyPixelLook(bPixelLook);
 		}
+		else if (Index == 2 || Index == 3)
+		{
+			if (UFVGameInstance* GI = Cast<UFVGameInstance>(GetGameInstance()))
+			{
+				if (Index == 2)
+				{
+					GI->bSoundOn = !GI->bSoundOn;
+				}
+				else
+				{
+					GI->bMusicOn = !GI->bMusicOn;
+					if (!GI->bMusicOn && Music)
+					{
+						Music->FadeOut(0.4f, 0.f);
+						Music = nullptr;
+					}
+					else if (GI->bMusicOn)
+					{
+						StartMusic();
+					}
+				}
+			}
+		}
 		else Back();
 		break;
 	}
@@ -245,11 +305,11 @@ void AFVMenuHUD::HandleKeys()
 	const int32 N = ItemCount();
 	if (Pressed({EKeys::Up, EKeys::W, EKeys::Gamepad_DPad_Up}))
 	{
-		Cursor = (Cursor - 1 + N) % N;
+		SetCursor((Cursor - 1 + N) % N);
 	}
 	if (Pressed({EKeys::Down, EKeys::S, EKeys::Gamepad_DPad_Down}))
 	{
-		Cursor = (Cursor + 1) % N;
+		SetCursor((Cursor + 1) % N);
 	}
 	if (Pressed({EKeys::Enter, EKeys::SpaceBar, EKeys::Gamepad_FaceButton_Bottom}) && ScreenTime > 0.15f)
 	{
@@ -274,9 +334,9 @@ void AFVMenuHUD::NotifyHitBoxClick(FName BoxName)
 void AFVMenuHUD::NotifyHitBoxBeginCursorOver(FName BoxName)
 {
 	const FString S = BoxName.ToString();
-	if (S.StartsWith(TEXT("Item_")))
+	if (S.StartsWith(TEXT("Item_")) && Screen != EFVMenuScreen::Title)
 	{
-		Cursor = FCString::Atoi(*S.RightChop(5));
+		SetCursor(FCString::Atoi(*S.RightChop(5)));
 	}
 }
 
@@ -450,18 +510,21 @@ void AFVMenuHUD::DrawSettings()
 	const UGameUserSettings* S = GEngine ? GEngine->GetGameUserSettings() : nullptr;
 	const bool bFull = S && S->GetFullscreenMode() != EWindowMode::Windowed;
 	const float M = P;
-	const FString Items[3] = {
+	const UFVGameInstance* GI = Cast<UFVGameInstance>(GetGameInstance());
+	const bool bSound = !GI || GI->bSoundOn;
+	const bool bMusic = !GI || GI->bMusicOn;
+	const FString Items[5] = {
 		FString::Printf(TEXT("FULLSCREEN: %s"), bFull ? TEXT("ON") : TEXT("OFF")),
 		FString::Printf(TEXT("PIXEL LOOK: %s"), bPixelLook ? TEXT("ON") : TEXT("OFF")),
+		FString::Printf(TEXT("SOUND: %s"), bSound ? TEXT("ON") : TEXT("OFF")),
+		FString::Printf(TEXT("MUSIC: %s"), bMusic ? TEXT("ON") : TEXT("OFF")),
 		TEXT("BACK")};
 	const float MinW = FVPixel::TextWidth(TEXT("FULLSCREEN: OFF"), M) + 10.f * M;
-	float Y = CH * 0.36f;
-	for (int32 i = 0; i < 3; ++i)
+	float Y = CH * 0.32f;
+	for (int32 i = 0; i < 5; ++i)
 	{
-		Y += MenuButton(Items[i], i, CW * 0.5f, Y, MinW, M) + 3.f * M;
+		Y += MenuButton(Items[i], i, CW * 0.5f, Y, MinW, M) + 2.5f * M;
 	}
-	const float Sm = FMath::Max(2.f, FMath::RoundToFloat(P * 0.6f));
-	FVPixel::DrawTextCentred(this, TEXT("SOUND SETTINGS COMING SOON"), CW * 0.5f, Y + 3.f * M, Sm, Grey);
 }
 
 void AFVMenuHUD::DrawHUD()

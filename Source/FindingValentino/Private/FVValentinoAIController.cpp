@@ -1,6 +1,7 @@
 #include "FVValentinoAIController.h"
 
 #include "EngineUtils.h"
+#include "FVAudio.h"
 #include "FVCarryComponent.h"
 #include "FVFamilyCharacter.h"
 #include "FVFamilyMemberData.h"
@@ -97,6 +98,7 @@ void AFVValentinoAIController::NibbleToes(APawn* Player, const UFVFamilyMemberDa
 	}
 	// a little hop of surprise
 	Who->LaunchCharacter(FVector(0.f, 0.f, 260.f), false, true);
+	FVAudio::PlayAt(this, EFVSound::Nibble, Who->GetActorLocation(), 0.9f);
 	const FString Name = Member ? Member->DisplayName.ToString() : FString(TEXT("Dad"));
 	FString Line;
 	if (Name.Contains(TEXT("Friend")))

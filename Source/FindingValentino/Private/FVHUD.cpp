@@ -9,6 +9,7 @@
 #include "FVGameInstance.h"
 #include "FVGameModes.h"
 #include "FVPixelArt.h"
+#include "FVAudio.h"
 #include "FVValentino.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -72,8 +73,18 @@ void AFVHUD::DrawPauseMenu()
 	FVPixel::DrawScanlines(this, CW, CH, FMath::Max(3.f, FMath::RoundToFloat(P * 0.5f)), 0.14f);
 }
 
+void AFVHUD::NotifyHitBoxBeginCursorOver(FName BoxName)
+{
+	if (BoxName != Hover)
+	{
+		FVAudio::Play2D(this, EFVSound::UIMove, 0.35f);
+	}
+	Hover = BoxName;
+}
+
 void AFVHUD::NotifyHitBoxClick(FName BoxName)
 {
+	FVAudio::Play2D(this, EFVSound::UISelect, 0.5f);
 	Super::NotifyHitBoxClick(BoxName);
 	AFVPlayerController* PC = Cast<AFVPlayerController>(GetOwningPlayerController());
 	if (BoxName == TEXT("Resume") && PC)
@@ -258,15 +269,16 @@ void AFVHUD::DrawHUD()
 		const FVector Screen = Project(Head, true);
 		const float TS = FMath::Max(2.f, FMath::RoundToFloat(S * FMath::Clamp(900.f / FMath::Max(Dist, 1.f), 0.6f, 1.2f)));
 		const FString Msg = Thought.ToString().ToUpper();
-		const float W = FVPixel::TextWidth(Msg, TS) + 8.f * TS;
-		const float H = 13.f * TS;
+		// comic-book cloud: room for the round ends and puffy bumps around the words
+		const float H = 15.f * TS;
+		const float W = FVPixel::TextWidth(Msg, TS) + H * 0.9f;
 		const float BX = Screen.X - W * 0.5f;
-		float BY = Screen.Y - H - 18.f * TS;
+		float BY = Screen.Y - H - 20.f * TS;
 		if (BX < PanelRight && BY < PanelBottom)
 		{
 			BY = PanelBottom + 2.f * S; // would cover the meters: drop it just below them
 		}
-		const FBox2D Rect(FVector2D(BX, BY), FVector2D(BX + W, BY + H + 12.f * TS));
+		const FBox2D Rect(FVector2D(BX - 2.f * TS, BY - 6.f * TS), FVector2D(BX + W + 2.f * TS, BY + H + 14.f * TS));
 		bool bOverlaps = false;
 		for (const FBox2D& D : Drawn)
 		{
@@ -279,16 +291,18 @@ void AFVHUD::DrawHUD()
 		Drawn.Add(Rect);
 		const FLinearColor Fill(1.f, 1.f, 1.f, 0.95f);
 		const FLinearColor Edge(0.1f, 0.08f, 0.2f);
-		FVPixel::DrawBox(this, BX, BY, W, H, TS * 0.75f, Fill, Edge);
-		// three shrinking square "thought dots" down toward the dog
-		float DY = BY + H + 2.f * TS;
+		const float Px = FMath::Max(1.f, FMath::RoundToFloat(TS * 0.5f));
+		FVPixel::DrawThoughtCloud(this, BX, BY, W, H, Px, Fill, Edge);
+		// three shrinking round "thought bubbles" trailing down to the dog
+		float DY = BY + H + 3.f * TS;
 		for (int32 i = 0; i < 3; ++i)
 		{
-			const float R = (3.f - i) * TS;
-			DrawRect(Edge, Screen.X - R * 0.5f - i * 2.f * TS - TS * 0.5f, DY - TS * 0.5f, R + TS, R + TS);
-			DrawRect(Fill, Screen.X - R * 0.5f - i * 2.f * TS, DY, R, R);
-			DY += R + 2.f * TS;
+			const float R = (2.4f - i * 0.7f) * TS;
+			const float DX = Screen.X - i * 1.8f * TS;
+			FVPixel::DrawDisc(this, DX, DY + R, R + FMath::Max(Px, 2.f), Px, Edge);
+			FVPixel::DrawDisc(this, DX, DY + R, R, Px, Fill);
+			DY += R * 2.f + 1.5f * TS;
 		}
-		FVPixel::DrawText(this, Msg, BX + 4.f * TS, BY + 3.f * TS, TS, Edge);
+		FVPixel::DrawTextCentred(this, Msg, BX + W * 0.5f, BY + (H - 7.f * TS) * 0.5f, TS, Edge);
 	}
 }
