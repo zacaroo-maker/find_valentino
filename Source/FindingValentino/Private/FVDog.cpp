@@ -6,6 +6,7 @@
 #include "EngineUtils.h"
 #include "FVAudio.h"
 #include "FVDogAIController.h"
+#include "FVDogPark.h"
 #include "FVValentino.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -157,9 +158,30 @@ void AFVDog::Bark()
 	}
 	// big dogs bark deeper, small ones yap higher
 	const float Pitch = FMath::Clamp(1.15f / FMath::Max(Size, 0.3f), 0.55f, 1.8f) * FMath::FRandRange(0.94f, 1.06f);
-	if (FVAudio::Enabled(this, EFVSound::Bark))
+	bool bAudible = true;
+	if (!bShowMeter)
 	{
-		FVAudio::PlayAt(this, EFVSound::Bark, GetActorLocation(), FMath::Clamp(0.6f + 0.25f * Size, 0.6f, 1.2f), Pitch);
+		// the dogs next door: from the garden you only hear one every now and then
+		const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+		const bool bPlayerAtPark = Player && AFVDogPark::FindAt(this, Player->GetActorLocation());
+		if (!bPlayerAtPark)
+		{
+			static double NextDistantBark = 0.0;
+			const double Now = GetWorld()->GetTimeSeconds();
+			if (Now < NextDistantBark && NextDistantBark - Now < 60.0)
+			{
+				bAudible = false;
+			}
+			else
+			{
+				NextDistantBark = Now + FMath::FRandRange(6.f, 16.f);
+			}
+		}
+	}
+	if (bAudible)
+	{
+		// barks are loud: they carry over the fence
+		FVAudio::PlayAt(this, EFVSound::Bark, GetActorLocation(), FMath::Clamp(0.6f + 0.25f * Size, 0.6f, 1.2f), Pitch, true);
 	}
 }
 

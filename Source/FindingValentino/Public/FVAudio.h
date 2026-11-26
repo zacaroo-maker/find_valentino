@@ -56,7 +56,7 @@ namespace FVAudio
 	/** A sound with no position (UI, music, ambience). Returns the component for loops so they can be stopped. */
 	FINDINGVALENTINO_API UAudioComponent* Play2D(const UObject* WorldContext, EFVSound Sound, float Volume = 1.f, float Pitch = 1.f, bool bKeepPlayingIntoNextLevel = false);
 	/** A sound in the world (gets quieter with distance). */
-	FINDINGVALENTINO_API void PlayAt(const UObject* WorldContext, EFVSound Sound, const FVector& Location, float Volume = 1.f, float Pitch = 1.f);
+	FINDINGVALENTINO_API void PlayAt(const UObject* WorldContext, EFVSound Sound, const FVector& Location, float Volume = 1.f, float Pitch = 1.f, bool bCarriesFar = false);
 	/** A looping sound that follows a component (e.g. water pouring from the can). */
 	FINDINGVALENTINO_API UAudioComponent* PlayAttached(EFVSound Sound, USceneComponent* AttachTo, float Volume = 1.f);
 }

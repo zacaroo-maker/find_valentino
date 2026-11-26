@@ -68,6 +68,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Menu")
 	bool IsPauseMenuOpen() const { return bMenuOpen; }
 
+	/** Console: "Weather 0".."Weather 4" = cool morning, mild, warm spring, hot summer, cloudy & breezy. */
+	UFUNCTION(Exec)
+	void Weather(int32 Index);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;

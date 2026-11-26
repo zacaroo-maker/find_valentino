@@ -10,6 +10,7 @@
 #include "FVGameModes.h"
 #include "FVPixelArt.h"
 #include "FVAudio.h"
+#include "FVWeather.h"
 #include "FVValentino.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -235,6 +236,45 @@ void AFVHUD::DrawHUD()
 	// keep thought bubbles clear of the meters panel
 	const float PanelRight = X + PanelW;
 	const float PanelBottom = Y;
+
+	// ---- today's weather (top-right): a little sun or cloud, the name and the temperature ----
+	if (const UFVWeatherSubsystem* Weather = GetWorld()->GetSubsystem<UFVWeatherSubsystem>())
+	{
+		const FString Name = Weather->GetWeatherName();
+		if (!Name.IsEmpty())
+		{
+			const FString Temp = FString::Printf(TEXT("%dC"), FMath::RoundToInt(Weather->GetTemperature()));
+			const float IconW = 10.f * S;
+			const float W = 4.f * S + IconW + 3.f * S + FMath::Max(FVPixel::TextWidth(Name, S), FVPixel::TextWidth(Temp, S)) + 4.f * S;
+			const float H = 4.f * S + 7.f * S + 3.f * S + 7.f * S + 3.f * S;
+			const float WX = Canvas->ClipX - 4.f * P - W;
+			const float WY = 4.f * P;
+			FVPixel::DrawBox(this, WX, WY, W, H, S * 0.75f, Ink, Cyan);
+			const float IX = WX + 4.f * S + IconW * 0.5f, IY = WY + H * 0.5f;
+			if (Weather->IsCloudy())
+			{
+				FVPixel::DrawDisc(this, IX - 2.f * S, IY + S, 3.f * S, S, FLinearColor(0.8f, 0.82f, 0.9f));
+				FVPixel::DrawDisc(this, IX + 1.5f * S, IY - S, 3.5f * S, S, FLinearColor(0.9f, 0.92f, 0.97f));
+				FVPixel::DrawDisc(this, IX + 3.f * S, IY + 1.5f * S, 2.5f * S, S, FLinearColor(0.8f, 0.82f, 0.9f));
+			}
+			else
+			{
+				const bool bHot = Weather->GetTemperature() >= 29.f;
+				const FLinearColor SunC = bHot ? FLinearColor(1.f, 0.55f, 0.15f) : Yellow;
+				// rays that slowly pulse, then the sun
+				const float Ray = (FMath::Fmod(T, 1.2f) < 0.6f ? 5.f : 4.5f) * S;
+				for (int32 a = 0; a < 8; ++a)
+				{
+					const float Ang = a * PI / 4.f;
+					DrawRect(SunC, FMath::RoundToFloat(IX + FMath::Cos(Ang) * Ray - S * 0.5f), FMath::RoundToFloat(IY + FMath::Sin(Ang) * Ray - S * 0.5f), S, S);
+				}
+				FVPixel::DrawDisc(this, IX, IY, 3.f * S, S, SunC);
+			}
+			const float TX = WX + 4.f * S + IconW + 3.f * S;
+			FVPixel::DrawText(this, Name, TX, WY + 4.f * S, S, Yellow, nullptr, S * 0.4f, ShadowPurple);
+			FVPixel::DrawText(this, Temp, TX, WY + 4.f * S + 10.f * S, S, White);
+		}
+	}
 
 	// ---- dogs' thought bubbles ----
 	APlayerController* PC = GetOwningPlayerController();

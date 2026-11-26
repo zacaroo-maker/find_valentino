@@ -41,20 +41,22 @@ namespace
 		return {};
 	}
 
-	USoundAttenuation* WorldAttenuation()
+	USoundAttenuation* WorldAttenuation(bool bFar = false)
 	{
-		// heard clearly up close, fades out across the garden
-		static TStrongObjectPtr<USoundAttenuation> Att;
-		if (!Att)
+		// normal: heard clearly up close, fades out across the garden
+		// far: loud sounds (barking next door) that carry over the fence
+		static TStrongObjectPtr<USoundAttenuation> Att[2];
+		TStrongObjectPtr<USoundAttenuation>& A = Att[bFar ? 1 : 0];
+		if (!A)
 		{
-			Att.Reset(NewObject<USoundAttenuation>());
-			Att->Attenuation.bAttenuate = true;
-			Att->Attenuation.bSpatialize = true;
-			Att->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
-			Att->Attenuation.AttenuationShapeExtents = FVector(250.f);
-			Att->Attenuation.FalloffDistance = 2200.f;
+			A.Reset(NewObject<USoundAttenuation>());
+			A->Attenuation.bAttenuate = true;
+			A->Attenuation.bSpatialize = true;
+			A->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
+			A->Attenuation.AttenuationShapeExtents = FVector(bFar ? 400.f : 250.f);
+			A->Attenuation.FalloffDistance = bFar ? 6000.f : 2200.f;
 		}
-		return Att.Get();
+		return A.Get();
 	}
 }
 
@@ -147,7 +149,7 @@ UAudioComponent* FVAudio::Play2D(const UObject* WorldContext, EFVSound Sound, fl
 	return nullptr;
 }
 
-void FVAudio::PlayAt(const UObject* WorldContext, EFVSound Sound, const FVector& Location, float Volume, float Pitch)
+void FVAudio::PlayAt(const UObject* WorldContext, EFVSound Sound, const FVector& Location, float Volume, float Pitch, bool bCarriesFar)
 {
 	if (!Enabled(WorldContext, Sound))
 	{
@@ -155,7 +157,7 @@ void FVAudio::PlayAt(const UObject* WorldContext, EFVSound Sound, const FVector&
 	}
 	if (USoundBase* S = Get(Sound))
 	{
-		UGameplayStatics::PlaySoundAtLocation(WorldContext, S, Location, Volume, Pitch, 0.f, WorldAttenuation());
+		UGameplayStatics::PlaySoundAtLocation(WorldContext, S, Location, Volume, Pitch, 0.f, WorldAttenuation(bCarriesFar));
 	}
 }
 

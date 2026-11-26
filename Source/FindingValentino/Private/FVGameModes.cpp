@@ -9,6 +9,7 @@
 #include "FVGameInstance.h"
 #include "FVHUD.h"
 #include "FVAudio.h"
+#include "FVWeather.h"
 #include "Engine/World.h"
 #include "FVMenuHUD.h"
 #include "Components/CapsuleComponent.h"
@@ -50,10 +51,11 @@ void AFVGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 void AFVGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	// garden ambience: birdsong and a light breeze (quieter under the menu music)
-	// played a little slower (and so a touch lower) for calmer, less busy chirping
-	FVAudio::Play2D(this, EFVSound::Birds, bMenuMode ? 0.2f : 0.42f, 0.78f);
-	FVAudio::Play2D(this, EFVSound::Wind, bMenuMode ? 0.08f : 0.18f);
+	// garden ambience (birds, wind) follows the weather; quieter under the menu music
+	if (UFVWeatherSubsystem* Weather = GetWorld()->GetSubsystem<UFVWeatherSubsystem>())
+	{
+		Weather->SetMenuMode(bMenuMode);
+	}
 	if (!bMenuMode)
 	{
 		return;
@@ -176,6 +178,14 @@ void AFVPlayerController::PlayerTick(float DeltaTime)
 	Super::PlayerTick(DeltaTime);
 	// footsteps for whoever is being played, timed to their feet touching the ground
 	Footsteps.Update(Cast<ACharacter>(GetPawn()), DeltaTime);
+}
+
+void AFVPlayerController::Weather(int32 Index)
+{
+	if (UFVWeatherSubsystem* W = GetWorld()->GetSubsystem<UFVWeatherSubsystem>())
+	{
+		W->SetWeather(Index, 3.f);
+	}
 }
 
 void AFVPlayerController::TogglePauseMenu()
