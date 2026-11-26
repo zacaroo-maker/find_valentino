@@ -1,0 +1,30 @@
+# Finding Valentino - code-only repository.
+# Game assets (Content/) are NOT versioned here: Fab/Megascans and Unreal starter content can't be
+# redistributed publicly, and the binary assets are too large for a free GitHub repo.
+
+# Unreal generated / local folders
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+Build/
+.vs/
+.vscode/
+.idea/
+
+# All game assets
+Content/
+
+# Local/IDE files
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# Downloaded third-party source files used by the asset scripts
+Tools/Downloads/

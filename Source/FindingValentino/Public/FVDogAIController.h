@@ -1,0 +1,59 @@
+// Finding Valentino - the dog's behaviour: find a sunny spot, lie there a long time, potter about, repeat.
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AIController.h"
+#include "FVDog.h"
+#include "FVDogAIController.generated.h"
+
+class ADirectionalLight;
+
+UCLASS()
+class FINDINGVALENTINO_API AFVDogAIController : public AAIController
+{
+	GENERATED_BODY()
+
+public:
+	AFVDogAIController();
+
+	UPROPERTY(EditAnywhere, Category = "Dog")
+	FVector2D LieSeconds = FVector2D(45.f, 150.f);
+	UPROPERTY(EditAnywhere, Category = "Dog")
+	FVector2D SniffSeconds = FVector2D(3.f, 7.f);
+	UPROPERTY(EditAnywhere, Category = "Dog")
+	float WanderRadius = 700.f;
+	/** How far he'll look for a sunny spot. */
+	UPROPERTY(EditAnywhere, Category = "Dog")
+	float SunSearchRadius = 1800.f;
+	/** Actors with this tag cast shade (tree canopies have no collision, so they're checked by shape). */
+	UPROPERTY(EditAnywhere, Category = "Dog")
+	FName ShadeTag = TEXT("FV_Shade");
+
+	/** True if this ground point is in direct sunlight. */
+	UFUNCTION(BlueprintPure, Category = "Dog")
+	bool IsSunny(const FVector& GroundPoint) const;
+
+protected:
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
+private:
+	void SetState(EFVDogState S);
+	void StartWander();
+	void StartSniff();
+	void StartGoingToSun();
+	void StartLyingDown();
+	FVector SunDirection() const;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AFVDog> Dog;
+	UPROPERTY(Transient)
+	TObjectPtr<ADirectionalLight> Sun;
+
+	EFVDogState State = EFVDogState::Wander;
+	float StateTimeLeft = 0.f;
+	float SunCheckTimeLeft = 0.f;
+	int32 WanderLegsLeft = 0;
+	bool bMoveDone = false;
+};
