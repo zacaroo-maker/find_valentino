@@ -51,7 +51,8 @@ void AFVGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	// garden ambience: birdsong and a light breeze (quieter under the menu music)
-	FVAudio::Play2D(this, EFVSound::Birds, bMenuMode ? 0.25f : 0.55f);
+	// played a little slower (and so a touch lower) for calmer, less busy chirping
+	FVAudio::Play2D(this, EFVSound::Birds, bMenuMode ? 0.2f : 0.42f, 0.78f);
 	FVAudio::Play2D(this, EFVSound::Wind, bMenuMode ? 0.08f : 0.18f);
 	if (!bMenuMode)
 	{
@@ -173,28 +174,8 @@ void AFVPlayerController::SetupInputComponent()
 void AFVPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
-	// soft footsteps on the grass, one per stride
-	const ACharacter* C = Cast<ACharacter>(GetPawn());
-	if (!C || !C->GetCharacterMovement())
-	{
-		return;
-	}
-	const float Speed = C->GetVelocity().Size2D();
-	if (C->GetCharacterMovement()->IsMovingOnGround() && Speed > 30.f)
-	{
-		StepDistance += Speed * DeltaTime;
-		const float Stride = FMath::Lerp(70.f, 110.f, FMath::Clamp((Speed - 150.f) / 350.f, 0.f, 1.f));
-		if (StepDistance >= Stride)
-		{
-			StepDistance = 0.f;
-			const FVector Foot = C->GetActorLocation() - FVector(0.f, 0.f, C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
-			FVAudio::PlayAt(this, EFVSound::Step, Foot, 0.35f, FMath::FRandRange(0.9f, 1.1f));
-		}
-	}
-	else
-	{
-		StepDistance = 0.f;
-	}
+	// footsteps for whoever is being played, timed to their feet touching the ground
+	Footsteps.Update(Cast<ACharacter>(GetPawn()), DeltaTime);
 }
 
 void AFVPlayerController::TogglePauseMenu()

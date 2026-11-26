@@ -1,6 +1,10 @@
 #include "FVAudio.h"
 
 #include "Components/AudioComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "FVGameInstance.h"
 #include "Kismet/GameplayStatics.h"
@@ -51,6 +55,48 @@ namespace
 			Att->Attenuation.FalloffDistance = 2200.f;
 		}
 		return Att.Get();
+	}
+}
+
+void FFVFootsteps::Update(ACharacter* Character, float DeltaSeconds)
+{
+	if (!Character || !Character->GetMesh() || !Character->GetCharacterMovement())
+	{
+		return;
+	}
+	USkeletalMeshComponent* Mesh = Character->GetMesh();
+	const bool bWalking = Character->GetCharacterMovement()->IsMovingOnGround() && Character->GetVelocity().Size2D() > 20.f;
+	const float Ground = Character->GetActorLocation().Z - Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	// mannequin / MetaHuman naming, or Dad's own skeleton
+	static const FName Bones[2][2] = {{TEXT("foot_l"), TEXT("L_foot")}, {TEXT("foot_r"), TEXT("R_foot")}};
+	for (int32 i = 0; i < 2; ++i)
+	{
+		FName Bone = Bones[i][0];
+		if (Mesh->GetBoneIndex(Bone) == INDEX_NONE)
+		{
+			Bone = Bones[i][1];
+			if (Mesh->GetBoneIndex(Bone) == INDEX_NONE)
+			{
+				continue;
+			}
+		}
+		const FVector Foot = Mesh->GetSocketLocation(Bone);
+		const float H = Foot.Z - Ground;
+		FFoot& F = Feet[i];
+		// track the contact height, letting it creep back up (idle poses, slopes, different characters)
+		F.Low = FMath::Min(F.Low + 6.f * DeltaSeconds, H);
+		if (H > F.Low + 7.f)
+		{
+			F.bArmed = true; // the foot is up in the air
+		}
+		else if (F.bArmed && H < F.Low + 2.5f)
+		{
+			F.bArmed = false; // ...and has come down: a step
+			if (bWalking)
+			{
+				FVAudio::PlayAt(Character, EFVSound::Step, FVector(Foot.X, Foot.Y, Ground), Volume, FMath::FRandRange(PitchRange.X, PitchRange.Y));
+			}
+		}
 	}
 }
 

@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
+#include "FVAudio.h"
 #include "FVGameModes.generated.h"
 
 class UInputAction;
@@ -75,5 +76,5 @@ protected:
 
 private:
 	bool bMenuOpen = false;
-	float StepDistance = 0.f;
+	FFVFootsteps Footsteps;
 };

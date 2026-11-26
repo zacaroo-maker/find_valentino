@@ -30,6 +30,22 @@ enum class EFVSound : uint8
 	Splash,
 };
 
+/** Plays a footstep at the moment each foot of a character's (visible or driving) mesh touches the ground. */
+struct FINDINGVALENTINO_API FFVFootsteps
+{
+	float Volume = 0.35f;
+	FVector2D PitchRange = FVector2D(0.9f, 1.1f);
+	void Update(class ACharacter* Character, float DeltaSeconds);
+
+private:
+	struct FFoot
+	{
+		float Low = 1000.f;  // lowest height seen recently (the contact height)
+		bool bArmed = false; // foot lifted since the last step
+	};
+	FFoot Feet[2];
+};
+
 namespace FVAudio
 {
 	FINDINGVALENTINO_API USoundBase* Get(EFVSound Sound);

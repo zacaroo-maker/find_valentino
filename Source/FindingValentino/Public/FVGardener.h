@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "FVAudio.h"
 #include "FVGardener.generated.h"
 
 UCLASS()
@@ -49,5 +50,5 @@ private:
 	bool bWalking = false;
 	float PauseLeft = 2.f;
 	float WalkTime = 0.f;
-	float StepDistance = 0.f;
+	FFVFootsteps Footsteps;
 };
