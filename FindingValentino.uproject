@@ -35,6 +35,10 @@
 		{
 			"Name": "AndroidFileServer",
 			"Enabled": false
+		},
+		{
+			"Name": "MetaHumanCharacter",
+			"Enabled": true
 		}
 	]
 }

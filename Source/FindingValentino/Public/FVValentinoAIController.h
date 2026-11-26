@@ -46,6 +46,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Valentino|Social")
 	float StopAtFeetDistance = 45.f;
 
+	/** Chance per check (every 4 s at someone's feet) of a toe nibble when warm and energetic. */
+	UPROPERTY(EditAnywhere, Category = "Valentino|Social")
+	float NibbleChance = 0.35f;
+
 	/** Thirst level at which he heads to the pond. */
 	UPROPERTY(EditAnywhere, Category = "Valentino|Pond")
 	float ThirstyAt = 0.7f;
@@ -75,6 +79,8 @@ private:
 	bool CanSeePlayer(APawn* Player, float RangeMultiplier = 1.f) const;
 	bool StartGoingToPond();
 	static bool IsHoldingFood(APawn* Player);
+	void NibbleToes(APawn* Player, const class UFVFamilyMemberData* Member);
+	float NibbleCooldown = 0.f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AFVValentino> Tortoise;

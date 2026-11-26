@@ -1,0 +1,76 @@
+// Finding Valentino - game modes and the player controller (pause menu).
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/PlayerController.h"
+#include "FVGameModes.generated.h"
+
+class UInputAction;
+class UInputMappingContext;
+class UFVFamilyMemberData;
+
+/** The garden: spawns the family member picked on the main menu and applies their settings. */
+UCLASS()
+class FINDINGVALENTINO_API AFVGameMode : public AGameModeBase
+{
+	GENERATED_BODY()
+
+public:
+	AFVGameMode();
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void BeginPlay() override;
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+	virtual void SetPlayerDefaults(APawn* PlayerPawn) override;
+
+	/** True when the garden is shown behind the main menu (opened with "?Menu", or a fresh packaged start). */
+	UFUNCTION(BlueprintPure, Category = "Family")
+	bool IsMenuMode() const { return bMenuMode; }
+
+private:
+	bool bMenuMode = false;
+
+public:
+
+	/** Who is playing (from the main menu); null if the level was started directly. */
+	UFUNCTION(BlueprintPure, Category = "Family")
+	UFVFamilyMemberData* GetSelectedMember() const;
+};
+
+/** The main menu: no player character, a camera looking at the garden, the character-select HUD. */
+UCLASS()
+class FINDINGVALENTINO_API AFVMenuGameMode : public AGameModeBase
+{
+	GENERATED_BODY()
+
+public:
+	AFVMenuGameMode();
+	virtual void BeginPlay() override;
+};
+
+/** Adds the pause menu (Esc in a packaged game, P in the editor). */
+UCLASS()
+class FINDINGVALENTINO_API AFVPlayerController : public APlayerController
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	TObjectPtr<UInputAction> PauseAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	TObjectPtr<UInputMappingContext> MenuMappingContext;
+
+	UFUNCTION(BlueprintCallable, Category = "Menu")
+	void TogglePauseMenu();
+	UFUNCTION(BlueprintCallable, Category = "Menu")
+	void GoToMainMenu();
+	UFUNCTION(BlueprintPure, Category = "Menu")
+	bool IsPauseMenuOpen() const { return bMenuOpen; }
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
+
+private:
+	bool bMenuOpen = false;
+};

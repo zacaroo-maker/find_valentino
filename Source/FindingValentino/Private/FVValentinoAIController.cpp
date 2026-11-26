@@ -2,6 +2,10 @@
 
 #include "EngineUtils.h"
 #include "FVCarryComponent.h"
+#include "FVFamilyCharacter.h"
+#include "FVFamilyMemberData.h"
+#include "FVGameInstance.h"
+#include "GameFramework/Character.h"
 #include "FVHidingSpot.h"
 #include "FVPond.h"
 #include "GameFramework/Pawn.h"
@@ -82,6 +86,34 @@ bool AFVValentinoAIController::StartGoingToPond()
 		return false;
 	}
 	return true;
+}
+
+void AFVValentinoAIController::NibbleToes(APawn* Player, const UFVFamilyMemberData* Member)
+{
+	ACharacter* Who = Cast<ACharacter>(Player);
+	if (!Who || !Tortoise)
+	{
+		return;
+	}
+	// a little hop of surprise
+	Who->LaunchCharacter(FVector(0.f, 0.f, 260.f), false, true);
+	const FString Name = Member ? Member->DisplayName.ToString() : FString(TEXT("Dad"));
+	FString Line;
+	if (Name.Contains(TEXT("Friend")))
+	{
+		// the family friend reacts most comically (design doc)
+		const TCHAR* Lines[] = { TEXT("AAAAH! He's eating my toes! Someone help!"), TEXT("Ow ow ow! Why always ME?!"), TEXT("My toes are not lettuce, Valentino!") };
+		Line = Lines[FMath::RandHelper(3)];
+	}
+	else
+	{
+		const TCHAR* Lines[] = { TEXT("Ouch! Valentino nibbled %s's toes!"), TEXT("Hey! Those toes aren't dandelions, Valentino!"), TEXT("Valentino gives %s's toes a cheeky nibble.") };
+		Line = FString(Lines[FMath::RandHelper(3)]).Replace(TEXT("%s"), *Name);
+	}
+	if (UFVCarryComponent* C = Player->FindComponentByClass<UFVCarryComponent>())
+	{
+		C->ShowToast(FText::FromString(Line), 3.5f);
+	}
 }
 
 bool AFVValentinoAIController::IsHoldingFood(APawn* Player)
@@ -220,9 +252,30 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
 	const float PlayerDist = Player ? FVector::Dist2D(Player->GetActorLocation(), Tortoise->GetActorLocation()) : BIG_NUMBER;
 	const float PlayerSpeed = Player ? Player->GetVelocity().Size2D() : 0.f;
+	// who is it? (Valentino is more at ease with some family members than others)
+	float Comfort = 1.f;
+	float StartleSpeedNow = StartleSpeed;
+	const UFVFamilyMemberData* Member = nullptr;
+	if (const AFVFamilyCharacter* FC = Cast<AFVFamilyCharacter>(Player))
+	{
+		Member = FC->MemberData;
+	}
+	if (!Member)
+	{
+		if (const UFVGameInstance* GI = Cast<UFVGameInstance>(GetGameInstance()))
+		{
+			Member = GI->SelectedMember;
+		}
+	}
+	if (Member)
+	{
+		Comfort = Member->ValentinoComfort;
+		StartleSpeedNow *= Member->StartleSpeedMultiplier;
+	}
+	NibbleCooldown -= DeltaSeconds;
 
 	// --- Startle: someone rushes up close -> into the shell ---
-	if (State != EFVValentinoState::Startled && Player && PlayerDist < StartleRadius && PlayerSpeed > StartleSpeed)
+	if (State != EFVValentinoState::Startled && Player && PlayerDist < StartleRadius && PlayerSpeed > StartleSpeedNow)
 	{
 		StopMovement();
 		ReleaseHidingSpot();
@@ -307,7 +360,17 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 		}
 		else if (PlayerDist <= StopAtFeetDistance + 20.f)
 		{
-			StopMovement(); // at the feet: just watch for now (toe-nibbling comes later)
+			StopMovement();
+			// warm and full of energy: sometimes he nibbles a toe (from the design doc)
+			if (NibbleCooldown <= 0.f)
+			{
+				NibbleCooldown = 4.f;
+				if (Tortoise->GetWarmthFactor() >= 0.9f && Tortoise->Energy > 0.55f && FMath::FRand() < NibbleChance)
+				{
+					NibbleToes(Player, Member);
+					NibbleCooldown = 15.f;
+				}
+			}
 			if (StateTimeLeft <= 0.f)
 			{
 				ApproachCooldown = 20.f;
@@ -331,7 +394,7 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 	if (bCalmState && ApproachCooldown <= 0.f && Player && PlayerSpeed < StartleSpeed * 0.6f && CanSeePlayer(Player, Smell))
 	{
 		ApproachCooldown = bFood ? 4.f : 8.f; // don't re-roll every frame
-		if (FMath::FRand() < ApproachChance * Smell * Tortoise->GetWarmthFactor())
+		if (FMath::FRand() < ApproachChance * Smell * Comfort * Tortoise->GetWarmthFactor())
 		{
 			bMoveDone = false;
 			ThinkCooldown = 0.f;

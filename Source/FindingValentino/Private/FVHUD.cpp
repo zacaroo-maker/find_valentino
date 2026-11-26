@@ -7,8 +7,53 @@
 #include "FVCarryComponent.h"
 #include "FVDog.h"
 #include "FVValentino.h"
+#include "FVFamilyMemberData.h"
+#include "FVGameInstance.h"
+#include "FVGameModes.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/KismetSystemLibrary.h"
+
+void AFVHUD::DrawPauseMenu()
+{
+	UFont* Font = GEngine->GetLargeFont();
+	UFont* Medium = GEngine->GetMediumFont();
+	const float CW = Canvas->ClipX, CH = Canvas->ClipY;
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.55f), 0.f, 0.f, CW, CH);
+	const FString Title = TEXT("Paused");
+	float TW = 0.f, TH = 0.f;
+	GetTextSize(Title, TW, TH, Font, 2.f);
+	DrawText(Title, FLinearColor(1.f, 0.92f, 0.8f), (CW - TW) * 0.5f, CH * 0.25f, Font, 2.f);
+	const float BW = CW * 0.24f, BH = CH * 0.075f, X = (CW - BW) * 0.5f;
+	const TPair<const TCHAR*, FName> Buttons[] = { { TEXT("Resume"), TEXT("Resume") }, { TEXT("Main menu"), TEXT("MainMenu") }, { TEXT("Quit"), TEXT("Quit") } };
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const float Y = CH * 0.38f + i * (BH + 16.f);
+		DrawRect(Hover == Buttons[i].Value ? FLinearColor(1.f, 1.f, 1.f, 0.35f) : FLinearColor(0.f, 0.f, 0.f, 0.6f), X, Y, BW, BH);
+		float W = 0.f, H = 0.f;
+		GetTextSize(Buttons[i].Key, W, H, Medium, 1.5f);
+		DrawText(Buttons[i].Key, FLinearColor::White, X + (BW - W) * 0.5f, Y + (BH - H) * 0.5f, Medium, 1.5f);
+		AddHitBox(FVector2D(X, Y), FVector2D(BW, BH), Buttons[i].Value, true);
+	}
+}
+
+void AFVHUD::NotifyHitBoxClick(FName BoxName)
+{
+	Super::NotifyHitBoxClick(BoxName);
+	AFVPlayerController* PC = Cast<AFVPlayerController>(GetOwningPlayerController());
+	if (BoxName == TEXT("Resume") && PC)
+	{
+		PC->TogglePauseMenu();
+	}
+	else if (BoxName == TEXT("MainMenu") && PC)
+	{
+		PC->GoToMainMenu();
+	}
+	else if (BoxName == TEXT("Quit"))
+	{
+		UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
+	}
+}
 
 void AFVHUD::DrawHUD()
 {
@@ -16,6 +61,14 @@ void AFVHUD::DrawHUD()
 	if (!Canvas)
 	{
 		return;
+	}
+	if (const AFVPlayerController* FPC = Cast<AFVPlayerController>(GetOwningPlayerController()))
+	{
+		if (FPC->IsPauseMenuOpen())
+		{
+			DrawPauseMenu();
+			return;
+		}
 	}
 	const APawn* Pawn = GetOwningPawn();
 	const UFVCarryComponent* Carry = Pawn ? Pawn->FindComponentByClass<UFVCarryComponent>() : nullptr;
@@ -76,6 +129,10 @@ void AFVHUD::DrawHUD()
 		Y += 14.f;
 	}
 
+	// keep thought bubbles clear of the meters panel
+	const float PanelRight = X + BarW + 130.f;
+	const float PanelBottom = Y;
+
 	// ---- the dog's thought bubble ----
 	APlayerController* PC = GetOwningPlayerController();
 	if (!PC)
@@ -101,7 +158,11 @@ void AFVHUD::DrawHUD()
 		GetTextSize(S, W, H, Font, Scale);
 		const float Pad = 12.f;
 		const float BX = Screen.X - W * 0.5f - Pad;
-		const float BY = Screen.Y - H - Pad * 2.f - 40.f * Scale;
+		float BY = Screen.Y - H - Pad * 2.f - 40.f * Scale;
+		if (BX < PanelRight && BY < PanelBottom)
+		{
+			BY = PanelBottom + 6.f; // would cover the energy meters: drop it just below them
+		}
 		const FLinearColor Fill(1.f, 1.f, 1.f, 0.88f);
 		// cloud: main box + rounded-looking corners, then three shrinking "thought dots" down to his head
 		DrawRect(Fill, BX, BY, W + Pad * 2.f, H + Pad * 2.f);

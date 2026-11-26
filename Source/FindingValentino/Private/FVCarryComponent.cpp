@@ -313,11 +313,22 @@ void UFVCarryComponent::Pet()
 	if (Dog && Dog->Pet())
 	{
 		++PetCount;
+		LastPetTime = GetWorld()->GetTimeSeconds();
+		LastPettedDog = Dog;
 		if (PetCount % 4 == 1)
 		{
 			ShowToast(FText::Format(LOCTEXT("Petted", "{0} loves it! (+energy)"), Dog->DogName), 2.f);
 		}
 	}
+}
+
+AActor* UFVCarryComponent::GetCarriedActor() const
+{
+	if (Carried)
+	{
+		return Carried;
+	}
+	return CarriedDog;
 }
 
 FText UFVCarryComponent::GetPetPrompt() const

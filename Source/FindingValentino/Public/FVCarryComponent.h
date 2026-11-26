@@ -73,6 +73,11 @@ public:
 	bool IsHoldingFood() const;
 	AFVPickupItem* GetHeldItem() const { return HeldItem; }
 	AFVValentino* GetCarriedValentino() const { return Carried; }
+	/** Valentino or the dog, whichever is in our arms (nullptr if neither). */
+	AActor* GetCarriedActor() const;
+	/** World time of the last pat (-1 if never) and who got it - for petting animations. */
+	float GetLastPetTime() const { return LastPetTime; }
+	class AFVDog* GetLastPettedDog() const { return LastPettedDog; }
 
 	/** Prompt for E; empty when there's nothing to do. */
 	UFUNCTION(BlueprintPure, Category = "Carry")
@@ -118,6 +123,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<class AFVDog> PettableDog;
 	int32 PetCount = 0;
+	float LastPetTime = -1.f;
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVDog> LastPettedDog;
 
 	bool bInputBound = false;
 	bool bUseHeld = false;
