@@ -6,6 +6,7 @@
 #include "FVAudio.h"
 #include "FVDog.h"
 #include "FVDogPark.h"
+#include "FVForagePlant.h"
 #include "FVGameModes.h"
 #include "FVPlantBed.h"
 #include "FVPond.h"
@@ -17,16 +18,28 @@
 
 namespace
 {
-	FString FoodName(EFVFoodType F)
+	FString WithArticle(EFVFoodType F)
 	{
-		switch (F)
-		{
-		case EFVFoodType::Lettuce: return TEXT("LETTUCE");
-		case EFVFoodType::Dandelion: return TEXT("DANDELION");
-		case EFVFoodType::Strawberry: return TEXT("STRAWBERRY");
-		case EFVFoodType::Worm: return TEXT("WORM");
-		}
-		return TEXT("FOOD");
+		return FVFood::WithArticle(F);
+	}
+}
+
+void UFVDaySubsystem::OnForaged(EFVFoodType Food)
+{
+	const uint32 Bit = 1u << (uint32)Food;
+	if (bRunning && !bSummary && !(ForagedMask & Bit))
+	{
+		ForagedMask |= Bit;
+		AddScore(25, FString::Printf(TEXT("FOUND %s"), *FVFood::Upper(Food)), TEXT("FORAGING"));
+	}
+}
+
+void UFVDaySubsystem::SetCraving(bool bOn, EFVFoodType Food)
+{
+	if (AFVValentino* V = GetValentino())
+	{
+		V->bHasCraving = bOn;
+		V->Craving = Food;
 	}
 }
 
@@ -84,6 +97,9 @@ void UFVDaySubsystem::StartDay(int32 Number)
 	FindTimer = 0.f;
 	SinceFound = 0.f;
 	NextGoalIn = 25.f;
+	NextCravingIn = FMath::FRandRange(30.f, 50.f);
+	ForagedMask = 0;
+	SetCraving(false);
 	if (const UFVSaveGame* Save = UFVSaveGame::Load())
 	{
 		HighScore = Save->HighScore;
@@ -170,7 +186,7 @@ void UFVDaySubsystem::MaybeAddGoal()
 {
 	const int32 Active = Goals.FilterByPredicate([](const FFVGoal& G)
 	{
-		return G.Type != EFVGoal::FindValentino && G.Type != EFVGoal::FindAgain && G.Type != EFVGoal::Bedtime;
+		return G.Type != EFVGoal::FindValentino && G.Type != EFVGoal::FindAgain && G.Type != EFVGoal::Bedtime && G.Type != EFVGoal::Craving;
 	}).Num();
 	if (Active >= 2 || Hour >= BedtimeHour - 0.25f)
 	{
@@ -263,11 +279,25 @@ void UFVDaySubsystem::UpdateGoals(float DeltaTime)
 			if (V && V->TimesEaten > G.Baseline)
 			{
 				bDone = true;
-				const bool bFav = V->LastFood == EFVFoodType::Strawberry;
-				AddScore(150, FString::Printf(TEXT("FED A %s"), *FoodName(V->LastFood)), TEXT("FEEDING"));
-				if (bFav)
+				AddScore(150, FString::Printf(TEXT("FED %s"), *WithArticle(V->LastFood)), TEXT("FEEDING"));
+				if (FVFood::IsTreat(V->LastFood))
 				{
-					AddScore(100, TEXT("HIS FAVOURITE!"), TEXT("FEEDING"));
+					AddScore(50, TEXT("A TASTY TREAT!"), TEXT("FEEDING"));
+				}
+			}
+			break;
+
+		case EFVGoal::Craving:
+			if (V && V->TimesEaten > G.Baseline)
+			{
+				if (V->LastFood == G.Food)
+				{
+					bDone = true;
+					AddScore(250, TEXT("JUST WHAT HE WANTED!"), TEXT("FEEDING"), true);
+				}
+				else
+				{
+					G.Baseline = V->TimesEaten; // nice, but not what he was dreaming of - keep wishing
 				}
 			}
 			break;
@@ -381,6 +411,12 @@ void UFVDaySubsystem::UpdateGoals(float DeltaTime)
 		}
 	}
 
+	// Valentino's thought bubble follows the craving goal (gone when it's done, expires or bedtime clears it)
+	{
+		const FFVGoal* C = Goals.FindByPredicate([](const FFVGoal& G) { return G.Type == EFVGoal::Craving; });
+		SetCraving(C != nullptr, C ? C->Food : EFVFoodType::Romaine);
+	}
+
 	// he slipped off to hide again during the day
 	SinceFound += DeltaTime;
 	if (V && !HasGoal(EFVGoal::FindValentino) && !HasGoal(EFVGoal::FindAgain) && !HasGoal(EFVGoal::Bedtime) && SinceFound > 60.f
@@ -425,6 +461,25 @@ void UFVDaySubsystem::Tick(float DeltaTime)
 		{
 			NextGoalIn = FMath::FRandRange(50.f, 90.f);
 			MaybeAddGoal();
+		}
+		// now and then Valentino dreams of something in particular
+		NextCravingIn -= DeltaTime;
+		AFVValentino* V = GetValentino();
+		if (NextCravingIn <= 0.f && V && !HasGoal(EFVGoal::Craving) && !HasGoal(EFVGoal::FindAgain) && Hour < BedtimeHour - 0.25f)
+		{
+			NextCravingIn = FMath::FRandRange(80.f, 140.f);
+			TArray<EFVFoodType> Growing; // only wish for things that grow in this garden
+			for (TActorIterator<AFVForagePlant> It(GetWorld()); It; ++It)
+			{
+				Growing.AddUnique(It->FoodType);
+			}
+			if (Growing.Num() > 0)
+			{
+				const EFVFoodType Food = Growing[FMath::RandHelper(Growing.Num())];
+				AddGoal(EFVGoal::Craving, FString::Printf(TEXT("VALENTINO WANTS %s"), *WithArticle(Food)), V, V->TimesEaten);
+				Goals.Last().Food = Food;
+				SetCraving(true, Food);
+			}
 		}
 	}
 	if (!bBedtimeAnnounced && Hour >= BedtimeHour)

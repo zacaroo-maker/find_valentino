@@ -26,7 +26,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Plant Bed")
 	float SproutDelay = 25.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Plant Bed")
-	TArray<EFVFoodType> SproutTypes = { EFVFoodType::Dandelion, EFVFoodType::Strawberry, EFVFoodType::Lettuce };
+	TArray<EFVFoodType> SproutTypes = { EFVFoodType::Dandelion, EFVFoodType::Strawberry, EFVFoodType::Romaine };
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Plant Bed")
 	int32 FoodPerWatering = 1;
 	/** How long the soil stays wet (seconds). */

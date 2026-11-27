@@ -6,6 +6,7 @@
 #include "FVCarryComponent.h"
 #include "FVDog.h"
 #include "FVFamilyMemberData.h"
+#include "FVForagePlant.h"
 #include "FVGameInstance.h"
 #include "FVGameModes.h"
 #include "FVPixelArt.h"
@@ -425,30 +426,103 @@ void AFVHUD::DrawHUD()
 	FVector CamLoc;
 	FRotator CamRot;
 	PC->GetPlayerViewPoint(CamLoc, CamRot);
-	// nearest first (Diego always first), and never let two bubbles overlap
-	TArray<AFVDog*> Dogs;
+	// ---- ripe plants twinkle now and then, so you can spot food from across the garden ----
+	{
+		const float Now = GetWorld()->GetTimeSeconds();
+		for (TActorIterator<AFVForagePlant> It(GetWorld()); It; ++It)
+		{
+			if (!It->IsRipe())
+			{
+				continue;
+			}
+			const FVector C = It->GetProduceCentre() + FVector(0, 0, 8.f);
+			const float Dist = FVector::Dist(CamLoc, C);
+			if (Dist > 3000.f || FVector::DotProduct(CamRot.Vector(), (C - CamLoc).GetSafeNormal()) < 0.3f)
+			{
+				continue;
+			}
+			// each plant: a 0.7 s twinkle every 2.6 s, at its own moment
+			const float Cycle = FMath::Fmod(Now / 2.6f + It->SparklePhase, 1.f) * 2.6f;
+			if (Cycle > 0.7f)
+			{
+				continue;
+			}
+			const float Grow = FMath::Sin(PI * Cycle / 0.7f); // 0 -> 1 -> 0
+			const FVector Sc = Project(C, true);
+			if (Sc.Z <= 0.f)
+			{
+				continue;
+			}
+			const float SP = FMath::Max(2.f, FMath::RoundToFloat(S * 0.5f * FMath::Clamp(1200.f / FMath::Max(Dist, 1.f), 0.6f, 1.4f)));
+			const int32 Arm = FMath::RoundToInt(1.f + 3.f * Grow);
+			const float X0 = FMath::RoundToFloat(Sc.X), Y0 = FMath::RoundToFloat(Sc.Y);
+			const FLinearColor Star(1.f, 0.97f, 0.6f, 0.95f);
+			DrawRect(FLinearColor::White, X0 - SP * 0.5f, Y0 - SP * 0.5f, SP, SP);
+			for (int32 k = 1; k <= Arm; ++k)
+			{
+				const FLinearColor C2 = k == Arm ? Star * FLinearColor(1, 1, 1, 0.6f) : Star;
+				DrawRect(C2, X0 - SP * 0.5f + k * SP, Y0 - SP * 0.5f, SP, SP);
+				DrawRect(C2, X0 - SP * 0.5f - k * SP, Y0 - SP * 0.5f, SP, SP);
+				DrawRect(C2, X0 - SP * 0.5f, Y0 - SP * 0.5f + k * SP, SP, SP);
+				DrawRect(C2, X0 - SP * 0.5f, Y0 - SP * 0.5f - k * SP, SP, SP);
+			}
+			if (Arm >= 3) // little diagonal glints at the peak
+			{
+				for (int32 dx = -1; dx <= 1; dx += 2)
+				{
+					for (int32 dy = -1; dy <= 1; dy += 2)
+					{
+						DrawRect(Star, X0 - SP * 0.5f + dx * SP, Y0 - SP * 0.5f + dy * SP, SP, SP);
+					}
+				}
+			}
+		}
+	}
+
+	// ---- thought bubbles: Valentino's wishes and the dogs' thoughts ----
+	struct FThinker
+	{
+		FVector Head;
+		FString Msg;
+		float MaxDist;
+		int32 Priority; // lower draws first
+	};
+	TArray<FThinker> Thinkers;
+	for (TActorIterator<AFVValentino> It(GetWorld()); It; ++It)
+	{
+		const FString Wish = It->GetThought();
+		if (!Wish.IsEmpty())
+		{
+			Thinkers.Add({It->GetActorLocation() + FVector(0, 0, 14.f), Wish, 2500.f, 0});
+		}
+	}
 	for (TActorIterator<AFVDog> It(GetWorld()); It; ++It)
 	{
-		Dogs.Add(*It);
+		const FText Thought = It->GetThought();
+		if (!Thought.IsEmpty())
+		{
+			Thinkers.Add({It->GetActorLocation() + FVector(0, 0, 55.f * It->GetActorScale3D().Z), Thought.ToString().ToUpper(),
+				It->bShowMeter ? 2500.f : 1400.f, It->bShowMeter ? 1 : 2});
+		}
 	}
-	Dogs.Sort([&](const AFVDog& A, const AFVDog& B)
+	// Valentino, then Diego, then nearest first; never let two bubbles overlap
+	Thinkers.Sort([&](const FThinker& A, const FThinker& B)
 	{
-		if (A.bShowMeter != B.bShowMeter) return A.bShowMeter;
-		return FVector::DistSquared(A.GetActorLocation(), CamLoc) < FVector::DistSquared(B.GetActorLocation(), CamLoc);
+		if (A.Priority != B.Priority) return A.Priority < B.Priority;
+		return FVector::DistSquared(A.Head, CamLoc) < FVector::DistSquared(B.Head, CamLoc);
 	});
 	TArray<FBox2D> Drawn;
-	for (AFVDog* It : Dogs)
+	for (const FThinker& It : Thinkers)
 	{
-		const FText Thought = It->GetThought();
-		const FVector Head = It->GetActorLocation() + FVector(0, 0, 55.f * It->GetActorScale3D().Z);
+		const FVector Head = It.Head;
 		const float Dist = FVector::Dist(CamLoc, Head);
-		if (Thought.IsEmpty() || Dist > (It->bShowMeter ? 2500.f : 1400.f) ||FVector::DotProduct(CamRot.Vector(), (Head - CamLoc).GetSafeNormal()) < 0.2f)
+		if (Dist > It.MaxDist || FVector::DotProduct(CamRot.Vector(), (Head - CamLoc).GetSafeNormal()) < 0.2f)
 		{
 			continue;
 		}
 		const FVector Screen = Project(Head, true);
 		const float TS = FMath::Max(2.f, FMath::RoundToFloat(S * FMath::Clamp(900.f / FMath::Max(Dist, 1.f), 0.6f, 1.2f)));
-		const FString Msg = Thought.ToString().ToUpper();
+		const FString& Msg = It.Msg;
 		// comic-book cloud: room for the round ends and puffy bumps around the words
 		const float H = 15.f * TS;
 		const float W = FVPixel::TextWidth(Msg, TS) + H * 0.9f;

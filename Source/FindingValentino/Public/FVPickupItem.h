@@ -28,7 +28,7 @@ public:
 
 	// ---- Food ----
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Food")
-	EFVFoodType FoodType = EFVFoodType::Lettuce;
+	EFVFoodType FoodType = EFVFoodType::Romaine;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Food")
 	float EnergyValue = 0.25f;
 

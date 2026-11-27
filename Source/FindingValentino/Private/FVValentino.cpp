@@ -141,6 +141,26 @@ bool AFVValentino::Eat(EFVFoodType Food, float EnergyValue)
 	return true;
 }
 
+FString AFVValentino::GetThought() const
+{
+	if (!bHasCraving || bRetracted || IsEating() || State == EFVValentinoState::Hiding || State == EFVValentinoState::GoingToHide)
+	{
+		return FString();
+	}
+	if (const AFVValentinoAIController* AI = Cast<AFVValentinoAIController>(GetController()))
+	{
+		if (AI->IsAsleep())
+		{
+			return FString();
+		}
+	}
+	// a few ways of wishing, changing every several seconds
+	static const TCHAR* Lines[] = { TEXT("MMM... %s..."), TEXT("I WISH I HAD %s"), TEXT("%s WOULD BE NICE") };
+	const int32 Which = FMath::FloorToInt(GetWorld()->GetTimeSeconds() / 7.f) % 3;
+	const FString Food = Which == 0 ? FVFood::Upper(Craving) : FVFood::WithArticle(Craving);
+	return FString(Lines[Which]).Replace(TEXT("%s"), *Food);
+}
+
 void AFVValentino::Drink(float Seconds)
 {
 	Thirst = FMath::Max(0.f, Thirst - Seconds * 0.08f);

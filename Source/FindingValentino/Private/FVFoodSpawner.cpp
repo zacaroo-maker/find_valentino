@@ -2,6 +2,7 @@
 
 #include "Components/BillboardComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "FVHidingSpot.h"
 #include "FVPickupItem.h"
@@ -21,24 +22,28 @@ AFVFoodSpawner::AFVFoodSpawner()
 #endif
 }
 
-UStaticMesh* AFVFoodSpawner::MeshFor(EFVFoodType T) const
+AFVFoodSpawner* AFVFoodSpawner::Get(const UObject* WorldContext)
 {
-	switch (T)
+	UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+	if (!World)
 	{
-	case EFVFoodType::Lettuce:    return LettuceMesh;
-	case EFVFoodType::Dandelion:  return DandelionMesh;
-	case EFVFoodType::Strawberry: return StrawberryMesh;
-	case EFVFoodType::Worm:       return WormMesh;
+		return nullptr;
+	}
+	for (TActorIterator<AFVFoodSpawner> It(World); It; ++It)
+	{
+		return *It;
 	}
 	return nullptr;
 }
 
 EFVFoodType AFVFoodSpawner::RandomType() const
 {
-	const float W[4] = { (float)Weights.X, (float)Weights.Y, (float)Weights.Z, (float)Weights.W };
-	const float Total = W[0] + W[1] + W[2] + W[3];
-	float Pick = FMath::FRand() * FMath::Max(Total, 0.01f);
-	for (int32 i = 0; i < 4; ++i)
+	// fallen bits: mostly greens and flowers, the odd treat
+	static const float W[(int32)EFVFoodType::Count] = { 3.f, 3.f, 1.f, 1.f, 2.f, 2.f };
+	float Total = 0.f;
+	for (float X : W) { Total += X; }
+	float Pick = FMath::FRand() * Total;
+	for (int32 i = 0; i < (int32)EFVFoodType::Count; ++i)
 	{
 		Pick -= W[i];
 		if (Pick <= 0.f)
@@ -46,7 +51,31 @@ EFVFoodType AFVFoodSpawner::RandomType() const
 			return (EFVFoodType)i;
 		}
 	}
-	return EFVFoodType::Lettuce;
+	return EFVFoodType::Romaine;
+}
+
+AFVPickupItem* AFVFoodSpawner::SpawnFood(EFVFoodType Type, const FTransform& Where)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	AFVPickupItem* Item = World->SpawnActorDeferred<AFVPickupItem>(AFVPickupItem::StaticClass(), Where);
+	if (!Item)
+	{
+		return nullptr;
+	}
+	Item->Kind = EFVItemKind::Food;
+	Item->FoodType = Type;
+	Item->EnergyValue = FVFood::Energy(Type);
+	if (const TObjectPtr<UStaticMesh>* M = FoodMeshes.Find(Type))
+	{
+		Item->Mesh->SetStaticMesh(*M);
+	}
+	Item->Tags.Add(TEXT("FV_Food"));
+	Item->FinishSpawning(Where);
+	return Item;
 }
 
 AFVPickupItem* AFVFoodSpawner::SpawnFoodAtGround(EFVFoodType Type, FVector NearLocation)
@@ -68,19 +97,7 @@ AFVPickupItem* AFVFoodSpawner::SpawnFoodAtGround(EFVFoodType Type, FVector NearL
 	{
 		Ground = Hit.ImpactPoint;
 	}
-	const FTransform T(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Ground);
-	AFVPickupItem* Item = World->SpawnActorDeferred<AFVPickupItem>(AFVPickupItem::StaticClass(), T);
-	if (!Item)
-	{
-		return nullptr;
-	}
-	Item->Kind = EFVItemKind::Food;
-	Item->FoodType = Type;
-	Item->EnergyValue = FVFood::Energy(Type);
-	Item->Mesh->SetStaticMesh(MeshFor(Type));
-	Item->Tags.Add(TEXT("FV_Food"));
-	Item->FinishSpawning(T);
-	return Item;
+	return SpawnFood(Type, FTransform(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Ground));
 }
 
 void AFVFoodSpawner::BeginPlay()

@@ -1,4 +1,4 @@
-// Finding Valentino - lets a player character pick up, carry and put down Valentino and garden items,
+﻿// Finding Valentino - lets a player character pick up, carry and put down Valentino and garden items,
 // give food to Valentino, and use the watering can.
 #pragma once
 
@@ -104,8 +104,11 @@ private:
 	bool FindCharacterDrop(ACharacter* Who, FVector& OutLocation) const;
 	/** How directly the player is aiming at a point (1 = dead centre). */
 	float AimAt(const FVector& Point) const;
+	class AFVForagePlant* FindReachablePlant() const;
 	/** Pick the single thing E would act on with free hands. */
-	void ChooseCandidate(AFVValentino*& V, class AFVDog*& D, AFVPickupItem*& I) const;
+	void ChooseCandidate(AFVValentino*& V, class AFVDog*& D, AFVPickupItem*& I, class AFVForagePlant*& Plant) const;
+	/** Take an item into our hands. */
+	void HoldItem(AFVPickupItem* Item);
 	FVector GetViewDir2D() const;
 
 	UPROPERTY(Transient)
@@ -116,6 +119,8 @@ private:
 	TObjectPtr<AFVValentino> CandidateValentino;
 	UPROPERTY(Transient)
 	TObjectPtr<AFVPickupItem> CandidateItem;
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVForagePlant> CandidatePlant;
 	UPROPERTY(Transient)
 	TObjectPtr<class AFVDog> CarriedDog;
 	UPROPERTY(Transient)

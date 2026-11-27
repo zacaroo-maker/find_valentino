@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "FVTypes.h"
 #include "FVDay.generated.h"
 
 class AFVValentino;
@@ -20,11 +21,13 @@ enum class EFVGoal : uint8
 	PetDiego,
 	PondCool,
 	Bedtime,
+	Craving,
 };
 
 struct FFVGoal
 {
 	EFVGoal Type = EFVGoal::FindValentino;
+	EFVFoodType Food = EFVFoodType::Romaine; // for Craving
 	FString Text;
 	TWeakObjectPtr<AActor> Target;
 	int32 Baseline = 0;
@@ -72,6 +75,9 @@ public:
 	int32 GetHighScore() const { return HighScore; }
 	bool WasPutToBed() const { return bInBed; }
 
+	/** The player picked food off a plant: the first of each kind each day earns a little bonus. */
+	void OnForaged(EFVFoodType Food);
+
 	/** Testing: jump the clock forward. */
 	void SkipHours(float Hours) { Hour = FMath::Min(Hour + Hours, EndHour - 0.01f); }
 
@@ -116,6 +122,9 @@ private:
 	TArray<FString> CategoryOrder;
 	TArray<TPair<FString, int32>> SummaryLines;
 	int32 LastPetCount = 0;
+	uint32 ForagedMask = 0;   // which foods were picked today
+	float NextCravingIn = 40.f;
+	void SetCraving(bool bOn, EFVFoodType Food = EFVFoodType::Romaine);
 
 	UPROPERTY(Transient)
 	TObjectPtr<ADirectionalLight> Sun;

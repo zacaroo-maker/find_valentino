@@ -4,7 +4,9 @@
 #include "EnhancedInputComponent.h"
 #include "FVAudio.h"
 #include "EngineUtils.h"
+#include "FVDay.h"
 #include "FVDog.h"
+#include "FVForagePlant.h"
 #include "FVPickupItem.h"
 #include "FVPlantBed.h"
 #include "FVPond.h"
@@ -265,19 +267,83 @@ AFVDog* UFVCarryComponent::FindReachableDog() const
 	return Best;
 }
 
-void UFVCarryComponent::ChooseCandidate(AFVValentino*& V, AFVDog*& D, AFVPickupItem*& I) const
+AFVForagePlant* UFVCarryComponent::FindReachablePlant() const
+{
+	const AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return nullptr;
+	}
+	const FVector ViewDir = GetViewDir2D();
+	const float CosLimit = FMath::Cos(FMath::DegreesToRadians(ReachHalfAngleDeg + 10.f));
+	const FVector P = Owner->GetActorLocation();
+	AFVForagePlant* Best = nullptr;
+	float BestAim = -2.f;
+	for (TActorIterator<AFVForagePlant> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsRipe())
+		{
+			continue;
+		}
+		const FVector C = It->GetProduceCentre();
+		const FVector To(C.X - P.X, C.Y - P.Y, 0.f);
+		// big plants (the hibiscus bush) can be reached from their edge
+		const float Edge = FMath::Max(It->ProduceMesh->Bounds.BoxExtent.X, It->ProduceMesh->Bounds.BoxExtent.Y) * 0.6f;
+		const float Dist = FMath::Max(0.f, To.Size() - Edge);
+		if (Dist > ItemReach || FMath::Abs(C.Z - P.Z) > 200.f)
+		{
+			continue;
+		}
+		const bool bInView = To.IsNearlyZero(5.f) || FVector::DotProduct(ViewDir, To.GetSafeNormal()) >= CosLimit;
+		if (!(bInView || Dist < 40.f))
+		{
+			continue;
+		}
+		const float Aim = AimAt(C);
+		if (Aim > BestAim)
+		{
+			BestAim = Aim;
+			Best = *It;
+		}
+	}
+	return Best;
+}
+
+void UFVCarryComponent::ChooseCandidate(AFVValentino*& V, AFVDog*& D, AFVPickupItem*& I, AFVForagePlant*& Plant) const
 {
 	float ItemDist;
 	V = FindReachableValentino();
 	D = FindReachableDog();
 	I = FindReachableItem(ItemDist);
+	Plant = FindReachablePlant();
 	const float AV = V ? AimAt(V->GetActorLocation()) : -3.f;
 	const float AD = D ? AimAt(D->GetActorLocation()) : -3.f;
 	const float AI = I ? AimAt(I->Mesh->Bounds.Origin) : -3.f;
+	const float AP = Plant ? AimAt(Plant->GetProduceCentre()) : -3.f;
 	// keep only the one aimed at most directly
-	if (AV >= AD && AV >= AI) { D = nullptr; I = nullptr; }
-	else if (AD >= AV && AD >= AI) { V = nullptr; I = nullptr; }
-	else { V = nullptr; D = nullptr; }
+	const float Best = FMath::Max(FMath::Max(AV, AD), FMath::Max(AI, AP));
+	if (AV >= Best) { D = nullptr; I = nullptr; Plant = nullptr; }
+	else if (AD >= Best) { V = nullptr; I = nullptr; Plant = nullptr; }
+	else if (AI >= Best) { V = nullptr; D = nullptr; Plant = nullptr; }
+	else { V = nullptr; D = nullptr; I = nullptr; }
+}
+
+void UFVCarryComponent::HoldItem(AFVPickupItem* Item)
+{
+	const ACharacter* Owner = Cast<ACharacter>(GetOwner());
+	if (!Owner || !Item)
+	{
+		return;
+	}
+	Item->PrepareForPickup();
+	const FVector Half = Item->GetRestHalfExtent();
+	const float Size = FMath::Max(Half.X, Half.Y);
+	// hold small things at the hands, big things (benches) further out and lower
+	const FVector Rel(30.f + Size, Item->Kind == EFVItemKind::WateringCan ? 22.f : 0.f, FMath::Clamp(15.f - Half.Z, -55.f, 10.f));
+	// the watering can is always held spout-forward; other things keep the way they were facing
+	const float RelYaw = Item->Kind == EFVItemKind::WateringCan ? 0.f : FRotator::NormalizeAxis(Item->GetRestYaw() - Owner->GetActorRotation().Yaw);
+	Item->AttachToHolder(const_cast<ACharacter*>(Owner), Rel, RelYaw);
+	HeldItem = Item;
 }
 
 bool UFVCarryComponent::FindCharacterDrop(ACharacter* Who, FVector& OutLocation) const
@@ -395,9 +461,12 @@ void UFVCarryComponent::Interact()
 			if (AFVValentino* V = FindReachableValentino())
 			{
 				const FText Food = HeldItem->GetLabel();
+				const bool bWanted = V->bHasCraving && V->Craving == HeldItem->FoodType;
 				if (V->Eat(HeldItem->FoodType, HeldItem->EnergyValue))
 				{
-					ShowToast(FText::Format(LOCTEXT("Ate", "Valentino munches the {0}!"), Food));
+					ShowToast(bWanted ? FText::Format(LOCTEXT("AteWanted", "Just what Valentino wanted!"), Food)
+					                  : FVFood::IsTreat(HeldItem->FoodType) ? FText::Format(LOCTEXT("AteTreat", "Yum! Valentino gobbles the {0}!"), Food)
+					                  : FText::Format(LOCTEXT("Ate", "Valentino munches the {0}!"), Food));
 					HeldItem->Destroy();
 					HeldItem = nullptr;
 				}
@@ -423,7 +492,21 @@ void UFVCarryComponent::Interact()
 	AFVValentino* V;
 	AFVDog* D;
 	AFVPickupItem* Item;
-	ChooseCandidate(V, D, Item);
+	AFVForagePlant* Plant;
+	ChooseCandidate(V, D, Item, Plant);
+	if (Plant)
+	{
+		// pick food off the plant, straight into our hands
+		Item = Plant->Pick();
+		if (Item)
+		{
+			ShowToast(FText::Format(LOCTEXT("Picked", "Picked: {0}"), Item->GetLabel()), 2.f);
+			if (UFVDaySubsystem* Day = GetWorld()->GetSubsystem<UFVDaySubsystem>())
+			{
+				Day->OnForaged(Item->FoodType);
+			}
+		}
+	}
 	if (V)
 	{
 		Carried = V;
@@ -436,15 +519,7 @@ void UFVCarryComponent::Interact()
 	}
 	else if (Item)
 	{
-		Item->PrepareForPickup();
-		const FVector Half = Item->GetRestHalfExtent();
-		const float Size = FMath::Max(Half.X, Half.Y);
-		// hold small things at the hands, big things (benches) further out and lower
-		const FVector Rel(30.f + Size, Item->Kind == EFVItemKind::WateringCan ? 22.f : 0.f, FMath::Clamp(15.f - Half.Z, -55.f, 10.f));
-		// the watering can is always held spout-forward; other things keep the way they were facing
-		const float RelYaw = Item->Kind == EFVItemKind::WateringCan ? 0.f : FRotator::NormalizeAxis(Item->GetRestYaw() - Owner->GetActorRotation().Yaw);
-		Item->AttachToHolder(Owner, Rel, RelYaw);
-		HeldItem = Item;
+		HoldItem(Item);
 	}
 	if (V || D || Item)
 	{
@@ -453,6 +528,7 @@ void UFVCarryComponent::Interact()
 	CandidateItem = nullptr;
 	CandidateValentino = nullptr;
 	CandidateDog = nullptr;
+	CandidatePlant = nullptr;
 }
 
 void UFVCarryComponent::UseStarted()
@@ -528,6 +604,10 @@ FText UFVCarryComponent::GetPrompt() const
 	{
 		return FText::Format(LOCTEXT("PickItem", "E  -  Pick up the {0}"), CandidateItem->GetLabel());
 	}
+	if (CandidatePlant)
+	{
+		return FText::Format(LOCTEXT("PickPlant", "E  -  Pick {0}"), FVFood::Name(CandidatePlant->FoodType));
+	}
 	return FText::GetEmpty();
 }
 
@@ -559,6 +639,7 @@ void UFVCarryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	CandidateValentino = nullptr;
 	CandidateItem = nullptr;
 	CandidateDog = nullptr;
+	CandidatePlant = nullptr;
 	PettableDog = nullptr;
 	if (!Carried && !CarriedDog)
 	{
@@ -567,10 +648,12 @@ void UFVCarryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 			AFVValentino* V;
 			AFVDog* D;
 			AFVPickupItem* I;
-			ChooseCandidate(V, D, I);
+			AFVForagePlant* Plant;
+			ChooseCandidate(V, D, I, Plant);
 			CandidateValentino = V;
 			CandidateDog = D;
 			CandidateItem = I;
+			CandidatePlant = Plant;
 			PettableDog = FindReachableDog(); // can pet him even if E would pick up something else
 		}
 		else if (HeldItem->Kind == EFVItemKind::Food)

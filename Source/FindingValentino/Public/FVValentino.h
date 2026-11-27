@@ -125,7 +125,15 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
 	int32 TimesEaten = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
-	EFVFoodType LastFood = EFVFoodType::Lettuce;
+	EFVFoodType LastFood = EFVFoodType::Romaine;
+
+	/** Something he's dreaming of (set by the day's goals); shown as a thought bubble. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
+	bool bHasCraving = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Needs")
+	EFVFoodType Craving = EFVFoodType::Romaine;
+	/** Thought bubble text, empty when he has nothing on his mind (or is hiding / asleep). */
+	FString GetThought() const;
 
 	/** Current behaviour, set by the AI controller (shown for debugging). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino")
