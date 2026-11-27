@@ -4,7 +4,10 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "EngineUtils.h"
+#include "FVDay.h"
 #include "FVDogPark.h"
+#include "FVPickupItem.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -369,6 +372,163 @@ void AFVDogAIController::TickPark(AFVDogPark* Park, float DeltaSeconds)
 	}
 }
 
+// ---------------------------------------------------------------- fetch
+
+void AFVDogAIController::EndFetch(bool bDropBall)
+{
+	if (bDropBall && FetchBall && FetchBall->IsInMouth() && FetchBall->GetAttachParentActor() == Dog)
+	{
+		FetchBall->DropFromMouth(Dog->GetActorForwardVector() * 120.f + FVector(0, 0, 80.f));
+	}
+	FetchBall = nullptr;
+	bKeepAway = false;
+	Dog->PlaySpeed = 1.f;
+	StopMovement();
+	StartSniff();
+	StateTimeLeft = FMath::FRandRange(3.f, 5.f);
+}
+
+bool AFVDogAIController::TickFetch(float DeltaSeconds)
+{
+	if (!Dog->bShowMeter)
+	{
+		return false; // the dogs next door have their own games
+	}
+	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	const float Now = GetWorld()->GetTimeSeconds();
+
+	if (State != EFVDogState::Fetch && State != EFVDogState::Return)
+	{
+		// did someone just throw a ball?
+		for (TActorIterator<AFVPickupItem> It(GetWorld()); It; ++It)
+		{
+			AFVPickupItem* B = *It;
+			const float T = B->GetLastThrownTime();
+			if (B->Kind != EFVItemKind::Ball || B->IsHeld() || T < 0.f || T == HandledThrowTime || Now - T > 2.5f
+				|| FVector::Dist2D(B->GetActorLocation(), Dog->GetActorLocation()) > FetchNoticeRadius)
+			{
+				continue;
+			}
+			HandledThrowTime = T;
+			if (Dog->Energy < 0.12f)
+			{
+				Dog->Say(FText::FromString(TEXT("Too tired... later?")), 2.5f);
+				return false;
+			}
+			FetchBall = B;
+			bKeepAway = false;
+			Dog->CancelOneShot(); // springs up, even mid-nap
+			Dog->PlaySpeed = RunMultiplier;
+			SetState(EFVDogState::Fetch);
+			bMoveDone = false;
+			MoveToActor(B, 15.f, false);
+			FetchTimeLeft = 15.f;
+			Dog->Bark();
+			Dog->Say(FText::FromString(TEXT("BALL!!")), 1.2f);
+			return true;
+		}
+		return false;
+	}
+
+	FetchTimeLeft -= DeltaSeconds;
+	if (!FetchBall || FetchTimeLeft <= 0.f)
+	{
+		EndFetch(true);
+		return true;
+	}
+
+	if (State == EFVDogState::Fetch)
+	{
+		// someone else grabbed it first
+		if (FetchBall->IsHeld())
+		{
+			Dog->Say(FText::FromString(TEXT("Aww...")), 1.5f);
+			EndFetch(false);
+			return true;
+		}
+		// keep chasing where it's rolling
+		if (bMoveDone)
+		{
+			bMoveDone = false;
+			MoveToActor(FetchBall, 15.f, false);
+		}
+		const float Reach = 45.f * Dog->GetActorScale3D().X;
+		if (FVector::Dist2D(FetchBall->GetActorLocation(), Dog->GetActorLocation()) < Reach
+			&& FMath::Abs(FetchBall->GetActorLocation().Z - Dog->GetActorLocation().Z) < 60.f
+			&& FetchBall->Mesh->GetPhysicsLinearVelocity().Size() < 500.f)
+		{
+			// got it!
+			FetchBall->HoldInMouth(Dog, FVector(30.f, 0.f, 4.f));
+			SetState(EFVDogState::Return);
+			FetchTimeLeft = 20.f;
+			bMoveDone = false;
+			bKeepAway = FMath::FRand() < KeepAwayChance;
+			if (bKeepAway)
+			{
+				// zoomies with the ball - you'll have to go and get it
+				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+				FNavLocation Dest;
+				if (Nav && Nav->GetRandomReachablePointInRadius(Dog->GetActorLocation(), 900.f, Dest))
+				{
+					Dog->PlaySpeed = RunMultiplier * 1.1f;
+					MoveToLocation(Dest.Location, 40.f);
+					Dog->Say(FText::FromString(TEXT("Can't catch me!")), 2.5f);
+					return true;
+				}
+				bKeepAway = false;
+			}
+			Dog->PlaySpeed = RunMultiplier * 0.8f; // trots back proudly
+			if (Player)
+			{
+				MoveToActor(Player, 110.f, false);
+			}
+		}
+		return true;
+	}
+
+	// State == Return
+	if (bKeepAway)
+	{
+		if (bMoveDone)
+		{
+			Dog->Say(FText::FromString(TEXT("Hehe. Come and get it!")), 3.f);
+			EndFetch(true);
+		}
+		return true;
+	}
+	if (!Player)
+	{
+		EndFetch(true);
+		return true;
+	}
+	if (bMoveDone && FVector::Dist2D(Player->GetActorLocation(), Dog->GetActorLocation()) > 170.f)
+	{
+		bMoveDone = false;
+		MoveToActor(Player, 110.f, false); // you moved: follow
+	}
+	if (FVector::Dist2D(Player->GetActorLocation(), Dog->GetActorLocation()) < 170.f)
+	{
+		// drop it at your feet and wait for the next throw
+		StopMovement();
+		const FVector ToPlayer = (Player->GetActorLocation() - Dog->GetActorLocation()).GetSafeNormal2D();
+		Dog->SetActorRotation(ToPlayer.Rotation());
+		FetchBall->DropFromMouth(ToPlayer * 90.f + FVector(0, 0, 60.f));
+		FetchBall = nullptr;
+		Dog->Bark();
+		Dog->Say(FText::FromString(FMath::RandBool() ? TEXT("Again! AGAIN!") : TEXT("Throw it! Throw it!")), 3.f);
+		if (UFVDaySubsystem* Day = GetWorld()->GetSubsystem<UFVDaySubsystem>())
+		{
+			Day->OnFetch();
+		}
+		Dog->PlaySpeed = 1.f;
+		SetState(EFVDogState::Sniff);
+		Dog->SetPoseLoop(nullptr); // stands there wagging
+		StateTimeLeft = 8.f;
+		WanderLegsLeft = 0;
+	}
+	return true;
+}
+
 void AFVDogAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
 	Super::OnMoveCompleted(RequestID, Result);
@@ -387,6 +547,12 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 	{
 		if (State != EFVDogState::Held)
 		{
+			if (FetchBall && FetchBall->IsInMouth())
+			{
+				FetchBall->DropFromMouth(FVector(0, 0, 50.f)); // picked up mid-fetch: he lets go of the ball
+			}
+			FetchBall = nullptr;
+			Dog->PlaySpeed = 1.f;
 			StopMovement();
 			SetState(EFVDogState::Held);
 		}
@@ -405,6 +571,12 @@ void AFVDogAIController::Tick(float DeltaSeconds)
 		SetState(EFVDogState::Sniff);
 		Dog->SetPoseLoop(nullptr);
 		StateTimeLeft = FMath::Max(StateTimeLeft, 3.f);
+	}
+
+	// a thrown ball beats everything else
+	if (TickFetch(DeltaSeconds))
+	{
+		return;
 	}
 
 	// at the dog park: play instead of the garden routine

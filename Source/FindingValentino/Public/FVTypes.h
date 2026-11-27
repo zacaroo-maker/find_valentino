@@ -9,7 +9,8 @@ enum class EFVItemKind : uint8
 {
 	Prop,         // garden objects you can move (pots, benches, chairs...)
 	Food,         // something Valentino eats
-	WateringCan
+	WateringCan,
+	Ball          // throw it (left click) and Diego fetches it
 };
 
 /** What the real Valentino likes: flowers, romaine, chicory, berries and tomatoes. */

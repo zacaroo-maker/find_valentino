@@ -54,6 +54,9 @@ public:
 	/** Watering reaches beds/Valentino this far in front of you. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
 	float WaterReach = 170.f;
+	/** How hard a ball is thrown (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Carry")
+	float ThrowSpeed = 1050.f;
 
 	UFUNCTION(BlueprintCallable, Category = "Carry")
 	void Interact();

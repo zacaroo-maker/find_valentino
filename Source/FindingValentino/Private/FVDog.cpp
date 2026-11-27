@@ -227,6 +227,18 @@ void AFVDog::UpdateThought(float DeltaSeconds)
 		Thought = PickThought({ TEXT("Wheee! I'm flying!"), TEXT("Put me down... or don't."), TEXT("I can see the whole garden!") });
 		return;
 	}
+	if (State == EFVDogState::Fetch)
+	{
+		Thought = PickThought({ TEXT("BALL BALL BALL!"), TEXT("Mine mine mine!"), TEXT("I'll get it!") });
+		ThoughtTimeLeft = 3.f;
+		return;
+	}
+	if (State == EFVDogState::Return)
+	{
+		Thought = PickThought({ TEXT("Mmf! Got it!"), TEXT("Look what I found!"), TEXT("Mmf mmf!") });
+		ThoughtTimeLeft = 3.f;
+		return;
+	}
 	if (bNearValentino && FMath::FRand() < 0.6f)
 	{
 		Thought = PickThought({ TEXT("Hello, shell friend!"), TEXT("Valentino! Wanna play?"), TEXT("Why is he so slow?") });

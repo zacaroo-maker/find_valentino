@@ -534,6 +534,23 @@ void UFVCarryComponent::Interact()
 void UFVCarryComponent::UseStarted()
 {
 	bUseHeld = true;
+	if (HeldItem && HeldItem->Kind == EFVItemKind::Ball)
+	{
+		// throw it where you're looking, in a nice arc
+		const ACharacter* Owner = Cast<ACharacter>(GetOwner());
+		FRotator Aim = Owner->GetActorRotation();
+		if (const AController* C = Owner->GetController())
+		{
+			Aim = C->GetControlRotation();
+		}
+		Aim.Pitch = FMath::Clamp(FRotator::NormalizeAxis(Aim.Pitch) + 18.f, 5.f, 60.f);
+		const FVector Start = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 45.f + FVector(0, 0, 45.f);
+		HeldItem->Throw(Start, Aim.Vector() * ThrowSpeed + Owner->GetVelocity() * 0.5f, GetOwner());
+		FVAudio::PlayAt(this, EFVSound::Pickup, Start, 0.6f, 1.4f);
+		HeldItem = nullptr;
+		bUseHeld = false;
+		return;
+	}
 	if (!HeldItem || HeldItem->Kind != EFVItemKind::WateringCan)
 	{
 		return;
@@ -613,6 +630,10 @@ FText UFVCarryComponent::GetPrompt() const
 
 FText UFVCarryComponent::GetUsePrompt() const
 {
+	if (HeldItem && HeldItem->Kind == EFVItemKind::Ball)
+	{
+		return LOCTEXT("UseThrow", "Left click  -  Throw the ball");
+	}
 	if (!HeldItem || HeldItem->Kind != EFVItemKind::WateringCan)
 	{
 		return FText::GetEmpty();

@@ -18,7 +18,9 @@ enum class EFVDogState : uint8
 	GettingUp,
 	Held,
 	Play,  // chasing another dog / zoomies (dog park)
-	Bark
+	Bark,
+	Fetch, // running after a thrown ball
+	Return // bringing the ball back (or running off with it)
 };
 
 UCLASS()
@@ -111,6 +113,8 @@ public:
 	float PlayOnce(UAnimSequence* Anim);
 	/** Holds a looping pose animation (lying / sniffing) instead of walk/idle. */
 	void SetPoseLoop(UAnimSequence* Anim);
+	/** Stop a lie-down / get-up one-shot right away (e.g. jumping up for a ball). */
+	void CancelOneShot() { OneShotTimeLeft = 0.f; PoseLoop = nullptr; CurrentAnim = nullptr; }
 
 protected:
 	virtual void BeginPlay() override;

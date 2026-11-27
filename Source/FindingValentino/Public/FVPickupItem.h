@@ -52,6 +52,17 @@ public:
 	FVector GetRestHalfExtent() const { return RestHalfExtent; }
 	float GetRestYaw() const { return RestRotation.Yaw; }
 
+	// ---- Ball ----
+	/** Throw it from where it is now (it must be held). */
+	void Throw(const FVector& Start, const FVector& Velocity, AActor* By);
+	/** A dog carries it in his mouth / drops it. */
+	void HoldInMouth(AActor* DogActor, const FVector& RelLocation);
+	void DropFromMouth(const FVector& Velocity);
+	bool IsInMouth() const { return bInMouth; }
+	/** World time it was last thrown (-1 if never) and by whom. */
+	float GetLastThrownTime() const { return LastThrownTime; }
+	AActor* GetThrownBy() const { return ThrownBy.Get(); }
+
 	void SetPouring(bool bPour);
 	bool IsPouring() const { return bPouring; }
 	FText GetLabel() const;
@@ -64,6 +75,9 @@ private:
 
 	bool bHeld = false;
 	bool bPouring = false;
+	bool bInMouth = false;
+	float LastThrownTime = -1.f;
+	TWeakObjectPtr<AActor> ThrownBy;
 	UPROPERTY(Transient)
 	TObjectPtr<class UAudioComponent> PourAudio;
 	FRotator RestRotation = FRotator::ZeroRotator;

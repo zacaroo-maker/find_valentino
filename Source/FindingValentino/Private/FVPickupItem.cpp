@@ -35,6 +35,17 @@ void AFVPickupItem::ApplyCollision()
 		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Mesh->SetCanEverAffectNavigation(false);
 	}
+	else if (Kind == EFVItemKind::Ball)
+	{
+		// a real bouncy, rolling ball (doesn't block anyone's path)
+		Mesh->SetCanEverAffectNavigation(false);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Mesh->SetCollisionProfileName(TEXT("PhysicsActor"));
+		Mesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore); // rolls through legs instead of tripping anyone
+		Mesh->SetLinearDamping(0.35f);
+		Mesh->SetAngularDamping(1.2f);
+		Mesh->SetSimulatePhysics(true);
+	}
 	else
 	{
 		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -69,6 +80,7 @@ void AFVPickupItem::AttachToHolder(AActor* Holder, const FVector& RelLocation, f
 {
 	bHeld = true;
 	HeldRelYaw = RelYaw;
+	Mesh->SetSimulatePhysics(false);
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AttachToActor(Holder, FAttachmentTransformRules::KeepWorldTransform);
 	SetActorRelativeLocation(RelLocation);
@@ -83,6 +95,38 @@ void AFVPickupItem::PlaceOnGround(const FVector& GroundPoint, float WorldYaw)
 		FRotator(RestRotation.Pitch, WorldYaw, RestRotation.Roll), false, nullptr, ETeleportType::TeleportPhysics);
 	bHeld = false;
 	ApplyCollision();
+}
+
+void AFVPickupItem::Throw(const FVector& Start, const FVector& Velocity, AActor* By)
+{
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	SetActorLocation(Start, false, nullptr, ETeleportType::TeleportPhysics);
+	bHeld = false;
+	bInMouth = false;
+	ApplyCollision();
+	Mesh->SetPhysicsLinearVelocity(Velocity);
+	Mesh->SetPhysicsAngularVelocityInDegrees(FVector(FMath::FRandRange(-400.f, 400.f), 600.f, 0.f));
+	LastThrownTime = GetWorld()->GetTimeSeconds();
+	ThrownBy = By;
+}
+
+void AFVPickupItem::HoldInMouth(AActor* DogActor, const FVector& RelLocation)
+{
+	bHeld = true;
+	bInMouth = true;
+	Mesh->SetSimulatePhysics(false);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AttachToActor(DogActor, FAttachmentTransformRules::KeepWorldTransform);
+	SetActorRelativeLocation(RelLocation);
+}
+
+void AFVPickupItem::DropFromMouth(const FVector& Velocity)
+{
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	bHeld = false;
+	bInMouth = false;
+	ApplyCollision();
+	Mesh->SetPhysicsLinearVelocity(Velocity);
 }
 
 void AFVPickupItem::SetPouring(bool bPour)

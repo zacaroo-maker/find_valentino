@@ -53,6 +53,24 @@ private:
 	void StartLyingDown();
 	FVector SunDirection() const;
 
+	// ---- fetch ----
+	/** Chase thrown balls / bring them back. Returns true while fetching (skips the normal routine). */
+	bool TickFetch(float DeltaSeconds);
+	void EndFetch(bool bDropBall);
+	UPROPERTY(Transient)
+	TObjectPtr<class AFVPickupItem> FetchBall;
+	float HandledThrowTime = -1.f;
+	bool bKeepAway = false;
+	float FetchTimeLeft = 0.f;
+public:
+	/** Fetch the ball he'll notice from this far away. Only the family dog plays fetch. */
+	UPROPERTY(EditAnywhere, Category = "Dog|Fetch")
+	float FetchNoticeRadius = 2500.f;
+	/** Chance he runs off with the ball instead of bringing it back. */
+	UPROPERTY(EditAnywhere, Category = "Dog|Fetch")
+	float KeepAwayChance = 0.15f;
+private:
+
 	// ---- dog park ----
 	void TickPark(class AFVDogPark* Park, float DeltaSeconds);
 	void ChooseParkActivity(class AFVDogPark* Park);

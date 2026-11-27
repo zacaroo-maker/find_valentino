@@ -7,6 +7,7 @@
 #include "FVDog.h"
 #include "FVDogPark.h"
 #include "FVForagePlant.h"
+#include "FVPickupItem.h"
 #include "FVGameModes.h"
 #include "FVPlantBed.h"
 #include "FVPond.h"
@@ -31,6 +32,21 @@ void UFVDaySubsystem::OnForaged(EFVFoodType Food)
 	{
 		ForagedMask |= Bit;
 		AddScore(25, FString::Printf(TEXT("FOUND %s"), *FVFood::Upper(Food)), TEXT("FORAGING"));
+	}
+}
+
+void UFVDaySubsystem::OnFetch()
+{
+	if (!bRunning || bSummary)
+	{
+		return;
+	}
+	++Fetches;
+	// outside the fetch goal: a little reward for each throw he brings back (capped)
+	if (!HasGoal(EFVGoal::Fetch) && FetchPoints < 100)
+	{
+		FetchPoints += 20;
+		AddScore(20, TEXT("GOOD FETCH!"), TEXT("DIEGO"));
 	}
 }
 
@@ -99,6 +115,8 @@ void UFVDaySubsystem::StartDay(int32 Number)
 	NextGoalIn = 25.f;
 	NextCravingIn = FMath::FRandRange(30.f, 50.f);
 	ForagedMask = 0;
+	Fetches = 0;
+	FetchPoints = 0;
 	SetCraving(false);
 	if (const UFVSaveGame* Save = UFVSaveGame::Load())
 	{
@@ -219,6 +237,18 @@ void UFVDaySubsystem::MaybeAddGoal()
 	if (D && !HasGoal(EFVGoal::DiegoPark) && D->Energy > 0.3f && !D->bInPark)
 	{
 		Options.Add([this, D]() { AddGoal(EFVGoal::DiegoPark, TEXT("TAKE DIEGO TO THE DOG PARK"), D, 0, 15.f); });
+	}
+	if (D && !HasGoal(EFVGoal::Fetch) && D->Energy > 0.35f && !D->bInPark)
+	{
+		bool bBall = false;
+		for (TActorIterator<AFVPickupItem> It(GetWorld()); It && !bBall; ++It)
+		{
+			bBall = It->Kind == EFVItemKind::Ball && !AFVDogPark::FindAt(this, It->GetActorLocation());
+		}
+		if (bBall)
+		{
+			Options.Add([this, D]() { AddGoal(EFVGoal::Fetch, TEXT("PLAY FETCH WITH DIEGO"), D, Fetches, 3.f); });
+		}
 	}
 	if (D && !HasGoal(EFVGoal::PetDiego))
 	{
@@ -342,6 +372,15 @@ void UFVDaySubsystem::UpdateGoals(float DeltaTime)
 					bDone = true;
 					AddScore(100, TEXT("HAPPY DIEGO"), TEXT("DIEGO"));
 				}
+			}
+			break;
+
+		case EFVGoal::Fetch:
+			G.Progress = float(Fetches - G.Baseline);
+			if (G.Progress >= G.Needed)
+			{
+				bDone = true;
+				AddScore(150, TEXT("FETCH CHAMPION!"), TEXT("DIEGO"));
 			}
 			break;
 

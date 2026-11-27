@@ -22,6 +22,7 @@ enum class EFVGoal : uint8
 	PondCool,
 	Bedtime,
 	Craving,
+	Fetch,
 };
 
 struct FFVGoal
@@ -77,6 +78,8 @@ public:
 
 	/** The player picked food off a plant: the first of each kind each day earns a little bonus. */
 	void OnForaged(EFVFoodType Food);
+	/** Diego brought the ball back. */
+	void OnFetch();
 
 	/** Testing: jump the clock forward. */
 	void SkipHours(float Hours) { Hour = FMath::Min(Hour + Hours, EndHour - 0.01f); }
@@ -123,6 +126,8 @@ private:
 	TArray<TPair<FString, int32>> SummaryLines;
 	int32 LastPetCount = 0;
 	uint32 ForagedMask = 0;   // which foods were picked today
+	int32 Fetches = 0;        // balls Diego brought back today
+	int32 FetchPoints = 0;
 	float NextCravingIn = 40.f;
 	void SetCraving(bool bOn, EFVFoodType Food = EFVFoodType::Romaine);
 
