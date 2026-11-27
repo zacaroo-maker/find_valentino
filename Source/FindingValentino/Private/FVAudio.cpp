@@ -34,7 +34,15 @@ namespace
 		case EFVSound::PetChime: return {TEXT("/Game/Audio/Pet_Chime.Pet_Chime")};
 		case EFVSound::Sprout: return {TEXT("/Game/Audio/Sprout_Sparkle.Sprout_Sparkle")};
 		case EFVSound::Nibble: return {TEXT("/Game/Audio/Nibble_Boing.Nibble_Boing")};
-		case EFVSound::Bark: return {TEXT("/Game/Audio/Dog_Bark.Dog_Bark"), TEXT("/Game/Audio/Dog_Bark2.Dog_Bark2")};
+		// real recordings from Wikimedia Commons (CC BY-SA; credited on the title screen and in CREDITS.md)
+		case EFVSound::Bark: return {
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_01.Dog_Bark_Real_01"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_02.Dog_Bark_Real_02"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_03.Dog_Bark_Real_03"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_04.Dog_Bark_Real_04"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_05.Dog_Bark_Real_05"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_06.Dog_Bark_Real_06"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_07.Dog_Bark_Real_07"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_08.Dog_Bark_Real_08"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_09.Dog_Bark_Real_09"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_10.Dog_Bark_Real_10"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_11.Dog_Bark_Real_11"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_12.Dog_Bark_Real_12"),
+			TEXT("/Game/Audio/Barks/Dog_Bark_Real_13.Dog_Bark_Real_13"), TEXT("/Game/Audio/Barks/Dog_Bark_Real_Double.Dog_Bark_Real_Double")};
 		case EFVSound::PourLoop: return {TEXT("/Game/Audio/Water_Pour_Loop.Water_Pour_Loop")};
 		case EFVSound::Splash: return {TEXT("/Game/Audio/Water_Splash.Water_Splash")};
 		}

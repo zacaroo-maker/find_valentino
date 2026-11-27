@@ -410,7 +410,10 @@ void AFVMenuHUD::DrawTitle()
 	const float X = FMath::Fmod(Time * 22.f * TP * 0.25f, Span) - 20.f * TP;
 	FVPixel::DrawTortoise(this, X, CH * 0.84f, TP, FMath::FloorToInt(Time * 4.f));
 
-	FVPixel::DrawTextCentred(this, TEXT("(C) 2026  A FAMILY GARDEN GAME"), CW * 0.5f, CH * 0.94f, S, Grey);
+	FVPixel::DrawTextCentred(this, TEXT("(C) 2026  A FAMILY GARDEN GAME"), CW * 0.5f, CH * 0.94f - 10.f * S, S, Grey);
+	// the real dog barks are CC BY-SA recordings: their recordists are credited here
+	FVPixel::DrawTextCentred(this, TEXT("DOG BARKS: AMADA44, ARMARTINELL, KRIPLOZOIK - WIKIMEDIA COMMONS, CC BY-SA"),
+		CW * 0.5f, CH * 0.94f, FMath::Max(1.f, FMath::RoundToFloat(S * 0.75f)), Grey);
 	// anywhere on screen counts as "start"
 	AddHitBox(FVector2D(0.f, 0.f), FVector2D(CW, CH), TEXT("Item_0"), true);
 }
