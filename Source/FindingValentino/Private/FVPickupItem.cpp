@@ -3,6 +3,7 @@
 #include "Components/AudioComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "FVAudio.h"
+#include "FVDecor.h"
 
 AFVPickupItem::AFVPickupItem()
 {
@@ -95,6 +96,13 @@ void AFVPickupItem::PlaceOnGround(const FVector& GroundPoint, float WorldYaw)
 		FRotator(RestRotation.Pitch, WorldYaw, RestRotation.Roll), false, nullptr, ETeleportType::TeleportPhysics);
 	bHeld = false;
 	ApplyCollision();
+	if (DecorIndex >= 0)
+	{
+		if (UFVDecorSubsystem* Decor = GetWorld()->GetSubsystem<UFVDecorSubsystem>())
+		{
+			Decor->OnMoved(this); // remember where it was put for tomorrow
+		}
+	}
 }
 
 void AFVPickupItem::Throw(const FVector& Start, const FVector& Velocity, AActor* By)

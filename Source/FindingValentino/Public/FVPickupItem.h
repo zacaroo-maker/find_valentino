@@ -52,6 +52,9 @@ public:
 	FVector GetRestHalfExtent() const { return RestHalfExtent; }
 	float GetRestYaw() const { return RestRotation.Yaw; }
 
+	/** Bought for Valentino's yard: its entry in the save file (-1 = part of the level). */
+	int32 DecorIndex = -1;
+
 	// ---- Ball ----
 	/** Throw it from where it is now (it must be held). */
 	void Throw(const FVector& Start, const FVector& Velocity, AActor* By);

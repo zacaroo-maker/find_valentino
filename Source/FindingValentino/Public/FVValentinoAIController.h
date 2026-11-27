@@ -86,6 +86,11 @@ private:
 	void ReleaseHidingSpot();
 	bool CanSeePlayer(APawn* Player, float RangeMultiplier = 1.f) const;
 	bool StartGoingToPond();
+	/** Off to warm up on a sunny basking stone (if there's one in the sun). */
+	bool StartGoingToBask();
+	bool IsInSun(const FVector& Point) const;
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> BaskStone;
 	static bool IsHoldingFood(APawn* Player);
 	void NibbleToes(APawn* Player, const class UFVFamilyMemberData* Member);
 	float NibbleCooldown = 0.f;

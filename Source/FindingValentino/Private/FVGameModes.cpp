@@ -1,4 +1,5 @@
-#include "FVGameModes.h"
+﻿#include "FVGameModes.h"
+#include "FVDecor.h"
 
 #include "Camera/CameraActor.h"
 #include "EngineUtils.h"
@@ -200,6 +201,22 @@ void AFVPlayerController::SkipTime(float Hours)
 	if (UFVDaySubsystem* D = GetWorld()->GetSubsystem<UFVDaySubsystem>())
 	{
 		D->SkipHours(Hours);
+	}
+}
+
+void AFVPlayerController::GardenPoints(int32 Points)
+{
+	if (UFVDecorSubsystem* D = GetWorld()->GetSubsystem<UFVDecorSubsystem>())
+	{
+		D->AddSavings(Points);
+	}
+}
+
+void AFVPlayerController::BuyDecor(int32 Index)
+{
+	if (UFVDecorSubsystem* D = GetWorld()->GetSubsystem<UFVDecorSubsystem>())
+	{
+		UE_LOG(LogTemp, Log, TEXT("FVDecor: %s"), *D->Buy(Index, GetPawn()));
 	}
 }
 

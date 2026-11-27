@@ -20,7 +20,9 @@ enum class EFVValentinoState : uint8
 	Held,
 	Eating,
 	GoingToPond,
-	AtPond
+	AtPond,
+	GoingToBask,
+	Basking   // warming up on a sunny stone
 };
 
 UCLASS()
@@ -134,6 +136,10 @@ public:
 	EFVFoodType Craving = EFVFoodType::Romaine;
 	/** Thought bubble text, empty when he has nothing on his mind (or is hiding / asleep). */
 	FString GetThought() const;
+
+	/** Extra warmth from basking on a sunny stone (fades slowly afterwards). Added to the warmth factor. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino|Environment")
+	float BaskWarmth = 0.f;
 
 	/** Current behaviour, set by the AI controller (shown for debugging). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Valentino")

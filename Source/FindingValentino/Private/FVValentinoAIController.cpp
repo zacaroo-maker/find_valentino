@@ -10,6 +10,7 @@
 #include "GameFramework/Character.h"
 #include "FVHidingSpot.h"
 #include "FVPond.h"
+#include "Engine/DirectionalLight.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
@@ -66,6 +67,67 @@ void AFVValentinoAIController::StartRest()
 	StateTimeLeft = FMath::RandRange(RestSeconds.X, RestSeconds.Y) / FMath::Max(Warmth, 0.25f) / (0.35f + 0.65f * Energy);
 }
 
+bool AFVValentinoAIController::IsInSun(const FVector& Point) const
+{
+	const ADirectionalLight* Sun = nullptr;
+	for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
+	{
+		Sun = *It;
+		break;
+	}
+	if (!Sun)
+	{
+		return true;
+	}
+	const FVector ToSun = -Sun->GetActorForwardVector();
+	if (ToSun.Z < 0.08f)
+	{
+		return false;
+	}
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(FVBaskSun), false, Tortoise);
+	const FVector Start = Point + FVector(0, 0, 12.f);
+	return !GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + ToSun * 5000.f, ECC_Visibility, Params);
+}
+
+bool AFVValentinoAIController::StartGoingToBask()
+{
+	if (!Tortoise)
+	{
+		return false;
+	}
+	// the nearest basking stone that's in the sun right now
+	AActor* Best = nullptr;
+	float BestDist = 2500.f;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("FV_BaskStone")) || It->GetAttachParentActor())
+		{
+			continue; // (being carried doesn't count)
+		}
+		const float D = FVector::Dist2D(It->GetActorLocation(), Tortoise->GetActorLocation());
+		if (D < BestDist && IsInSun(It->GetActorLocation()))
+		{
+			Best = *It;
+			BestDist = D;
+		}
+	}
+	if (!Best)
+	{
+		return false;
+	}
+	ReleaseHidingSpot();
+	BaskStone = Best;
+	bMoveDone = false;
+	SetState(EFVValentinoState::GoingToBask);
+	if (MoveToLocation(Best->GetActorLocation(), 12.f, false) == EPathFollowingRequestResult::Failed)
+	{
+		StartRest();
+		return false;
+	}
+	return true;
+}
+
 bool AFVValentinoAIController::StartGoingToPond()
 {
 	AFVPond* Pond = nullptr;
@@ -74,14 +136,38 @@ bool AFVValentinoAIController::StartGoingToPond()
 		Pond = *It;
 		break;
 	}
-	if (!Pond || !Tortoise)
+	if (!Tortoise)
+	{
+		return false;
+	}
+	// just thirsty: the nearest water, a water dish if there's one closer; hot: the pond, to soak
+	FVector Water = Pond ? Pond->GetDrinkLocation() : FVector::ZeroVector;
+	bool bAny = Pond != nullptr;
+	float Best = Pond ? FVector::Dist2D(Water, Tortoise->GetActorLocation()) : BIG_NUMBER;
+	if (!Tortoise->IsHot() || !Pond)
+	{
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (It->ActorHasTag(TEXT("FV_WaterDish")) && !It->GetAttachParentActor())
+			{
+				const float D = FVector::Dist2D(It->GetActorLocation(), Tortoise->GetActorLocation());
+				if (D < Best)
+				{
+					Best = D;
+					Water = It->GetActorLocation();
+					bAny = true;
+				}
+			}
+		}
+	}
+	if (!bAny)
 	{
 		return false;
 	}
 	ReleaseHidingSpot();
 	bMoveDone = false;
 	SetState(EFVValentinoState::GoingToPond);
-	const EPathFollowingRequestResult::Type R = MoveToLocation(Pond->GetDrinkLocation(), 20.f);
+	const EPathFollowingRequestResult::Type R = MoveToLocation(Water, 20.f);
 	if (R == EPathFollowingRequestResult::Failed)
 	{
 		StartRest();
@@ -374,6 +460,12 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 			{
 				break;
 			}
+			// cool (or a bit chilly first thing): warm up on a sunny stone, like real tortoises do
+			const bool bChilly = Tortoise->GetWarmthFactor() < 0.95f;
+			if (FMath::FRand() < (bChilly ? 0.6f : 0.18f) && StartGoingToBask())
+			{
+				break;
+			}
 			if (FMath::FRand() < HideChance && StartGoingToHide())
 			{
 				break;
@@ -404,6 +496,30 @@ void AFVValentinoAIController::Tick(float DeltaSeconds)
 		if (bMoveDone)
 		{
 			StartRest();
+		}
+		break;
+
+	case EFVValentinoState::GoingToBask:
+		if (!BaskStone || BaskStone->GetAttachParentActor())
+		{
+			StartRest(); // someone picked the stone up
+		}
+		else if (bMoveDone)
+		{
+			StopMovement();
+			SetState(EFVValentinoState::Basking);
+			StateTimeLeft = FMath::RandRange(25.f, 60.f);
+		}
+		break;
+
+	case EFVValentinoState::Basking:
+		// soaking up the warmth: stays warm (and quicker) for a good while afterwards
+		Tortoise->BaskWarmth = FMath::Min(0.45f, Tortoise->BaskWarmth + DeltaSeconds * 0.012f);
+		Tortoise->Energy = FMath::Min(1.f, Tortoise->Energy + DeltaSeconds * 0.002f);
+		if (StateTimeLeft <= 0.f || !BaskStone || BaskStone->GetAttachParentActor() || !IsInSun(Tortoise->GetActorLocation()))
+		{
+			BaskStone = nullptr;
+			StartWander();
 		}
 		break;
 

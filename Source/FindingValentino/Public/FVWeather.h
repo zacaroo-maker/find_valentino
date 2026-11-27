@@ -1,4 +1,4 @@
-// Finding Valentino - simple weather: a few kinds of day that slowly drift from one to the next.
+﻿// Finding Valentino - simple weather: a few kinds of day that slowly drift from one to the next.
 // Drives the temperature (Valentino reacts to it), how bright the sun is, and the garden ambience (birds, wind).
 #pragma once
 
@@ -25,6 +25,8 @@ struct FFVWeatherPreset
 	/** Rough chance weight when picking the next weather. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) float Weight = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) bool bCloudy = false;
+	/** How overcast the sky looks (0 = clear blue, 1 = grey cloud cover). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float Cloud = 0.f;
 };
 
 UCLASS()
@@ -76,4 +78,16 @@ private:
 	TObjectPtr<UAudioComponent> Wind;
 	UPROPERTY(Transient)
 	TObjectPtr<ADirectionalLight> SunLight;
+
+	// ---- how the day looks: cloud cover, haze, colour grading ----
+	void ApplyLook(const FFVWeatherPreset& W);
+	UPROPERTY(Transient)
+	TObjectPtr<class APostProcessVolume> LookVolume;
+	UPROPERTY(Transient)
+	TObjectPtr<class UMaterialInstanceDynamic> CloudMID;
+	UPROPERTY(Transient)
+	TObjectPtr<class UExponentialHeightFogComponent> Fog;
+	float FogBase = 0.01f;
+	float CloudCoverageBase = -0.2f;
+	float CloudDensityBase = 0.008f;
 };

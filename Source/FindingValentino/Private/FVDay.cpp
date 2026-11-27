@@ -7,6 +7,9 @@
 #include "FVDog.h"
 #include "FVDogPark.h"
 #include "FVForagePlant.h"
+#include "FVCarryComponent.h"
+#include "FVDecor.h"
+#include "InputCoreTypes.h"
 #include "FVPickupItem.h"
 #include "FVGameModes.h"
 #include "FVPlantBed.h"
@@ -32,6 +35,112 @@ void UFVDaySubsystem::OnForaged(EFVFoodType Food)
 	{
 		ForagedMask |= Bit;
 		AddScore(25, FString::Printf(TEXT("FOUND %s"), *FVFood::Upper(Food)), TEXT("FORAGING"));
+	}
+}
+
+// ---------------------------------------------------------------- intro and tips
+
+namespace
+{
+	const TCHAR* HintMessage(EFVHint H)
+	{
+		switch (H)
+		{
+		case EFVHint::Move:     return TEXT("WASD TO WALK, MOUSE TO LOOK AROUND. V SWITCHES THE CAMERA.");
+		case EFVHint::Search:   return TEXT("VALENTINO LOVES HIDING UNDER BUSHES, POTS AND BENCHES. LOOK LOW!");
+		case EFVHint::PickUp:   return TEXT("E PICKS HIM UP. HE'S A BIT SHY AT FIRST - GIVE HIM A MOMENT.");
+		case EFVHint::Sparkle:  return TEXT("SPARKLES MEAN FOOD IS READY TO PICK. HE LOVES FLOWERS AND GREENS.");
+		case EFVHint::Goals:    return TEXT("NEW JOBS POP UP IN YOUR TO DO LIST. EACH ONE EARNS POINTS.");
+		case EFVHint::Craving:  return TEXT("HIS THOUGHT BUBBLE SHOWS WHAT HE'S DREAMING OF. BRING HIM THAT!");
+		case EFVHint::Ball:     return TEXT("LEFT CLICK TO THROW THE BALL. DIEGO WILL FETCH IT!");
+		case EFVHint::Can:      return TEXT("HOLD LEFT CLICK TO WATER. REFILL THE CAN AT THE POND.");
+		case EFVHint::Pet:      return TEXT("PRESS F TO PET DIEGO. PATS GIVE HIM ENERGY.");
+		case EFVHint::Bedtime:  return TEXT("CARRY VALENTINO TO HIS LITTLE HOUSE TO TUCK HIM IN.");
+		case EFVHint::Decorate: return TEXT("PAUSE (ESC) > DECORATE TO SPEND YOUR GARDEN POINTS ON HIS YARD.");
+		default: break;
+		}
+		return TEXT("");
+	}
+}
+
+void UFVDaySubsystem::ShowHint(EFVHint Hint)
+{
+	const int32 Bit = 1 << (int32)Hint;
+	if ((HintsSeen & Bit) || HintQueue.Contains(Hint))
+	{
+		return;
+	}
+	HintQueue.Add(Hint);
+}
+
+void UFVDaySubsystem::UpdateIntroAndHints(float DeltaTime)
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (bIntro)
+	{
+		IntroAge += DeltaTime;
+		bool bKey = false;
+		if (PC && IntroAge > 1.2f)
+		{
+			for (const FKey& K : { EKeys::E, EKeys::SpaceBar, EKeys::Enter, EKeys::LeftMouseButton, EKeys::W, EKeys::A, EKeys::S, EKeys::D })
+			{
+				bKey |= PC->IsInputKeyDown(K);
+			}
+		}
+		if (bKey || IntroAge > 16.f)
+		{
+			bIntro = false;
+			FVAudio::Play2D(this, EFVSound::UISelect, 0.4f);
+			ShowHint(EFVHint::Move);
+		}
+		return; // tips wait until the card is gone
+	}
+
+	// things worth a tip the first time they happen
+	if (const APawn* P = PC ? PC->GetPawn() : nullptr)
+	{
+		if (const UFVCarryComponent* C = P->FindComponentByClass<UFVCarryComponent>())
+		{
+			if (const AFVPickupItem* I = C->GetHeldItem())
+			{
+				if (I->Kind == EFVItemKind::Ball) { ShowHint(EFVHint::Ball); }
+				if (I->Kind == EFVItemKind::WateringCan) { ShowHint(EFVHint::Can); }
+			}
+			if (!C->GetPetPrompt().IsEmpty()) { ShowHint(EFVHint::Pet); }
+		}
+	}
+	if (HasGoal(EFVGoal::FindValentino))
+	{
+		SearchTime += DeltaTime;
+		if (SearchTime > 35.f) { ShowHint(EFVHint::Search); }
+	}
+
+	// one tip at a time, with a little pause between them
+	if (!HintText.IsEmpty())
+	{
+		HintAge += DeltaTime;
+		if (HintAge > 8.f)
+		{
+			HintText.Empty();
+			HintGap = 1.5f;
+		}
+		return;
+	}
+	HintGap -= DeltaTime;
+	if (HintGap <= 0.f && HintQueue.Num() > 0)
+	{
+		const EFVHint H = HintQueue[0];
+		HintQueue.RemoveAt(0);
+		HintText = HintMessage(H);
+		HintAge = 0.f;
+		UE_LOG(LogTemp, Log, TEXT("FVHint: %s"), *HintText);
+		HintsSeen |= 1 << (int32)H;
+		if (UFVSaveGame* Save = UFVSaveGame::Load())
+		{
+			Save->HintsSeen = HintsSeen;
+			Save->Save();
+		}
+		FVAudio::Play2D(this, EFVSound::UIMove, 0.35f);
 	}
 }
 
@@ -121,7 +230,15 @@ void UFVDaySubsystem::StartDay(int32 Number)
 	if (const UFVSaveGame* Save = UFVSaveGame::Load())
 	{
 		HighScore = Save->HighScore;
+		HintsSeen = Save->HintsSeen;
 	}
+	// the story card on the first day of a game
+	bIntro = Day == 1;
+	IntroAge = 0.f;
+	HintQueue.Reset();
+	HintText.Empty();
+	HintGap = 2.f;
+	SearchTime = 0.f;
 	for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
 	{
 		Sun = *It;
@@ -146,6 +263,14 @@ void UFVDaySubsystem::StartDay(int32 Number)
 void UFVDaySubsystem::AddScore(int32 Points, const FString& Why, const FString& Category, bool bBig)
 {
 	Score += Points;
+	if (UFVDecorSubsystem* Decor = GetWorld()->GetSubsystem<UFVDecorSubsystem>())
+	{
+		Decor->AddSavings(Points); // everything earned can be spent on his yard
+		if (Decor->GetSavings() >= 200)
+		{
+			ShowHint(EFVHint::Decorate);
+		}
+	}
 	if (!ByCategory.Contains(Category))
 	{
 		CategoryOrder.Add(Category);
@@ -178,6 +303,9 @@ void UFVDaySubsystem::AddGoal(EFVGoal Type, const FString& Text, AActor* Target,
 	G.Baseline = Baseline;
 	G.Needed = Needed;
 	Goals.Add(G);
+	if (Type == EFVGoal::Craving) { ShowHint(EFVHint::Craving); }
+	else if (Type == EFVGoal::Bedtime) { ShowHint(EFVHint::Bedtime); }
+	else if (Type != EFVGoal::FindValentino && Type != EFVGoal::FindAgain) { ShowHint(EFVHint::Goals); }
 	FVAudio::Play2D(this, EFVSound::UIPause, 0.35f);
 }
 
@@ -194,8 +322,16 @@ void UFVDaySubsystem::UpdateSun()
 	const float Elevation = 4.f + 54.f * FMath::Sin(PI * T);
 	const float Yaw = SunBase.Yaw + (T - 0.5f) * 150.f;
 	Sun->SetActorRotation(FRotator(-Elevation, Yaw, 0.f));
-	const float Warm = FMath::Clamp(1.f - (Elevation - 4.f) / 22.f, 0.f, 1.f);
-	Sun->GetLightComponent()->SetLightColor(FMath::Lerp(SunColorBase, FLinearColor(1.f, 0.62f, 0.38f), Warm * 0.8f));
+	// golden hour: the light starts warming well before sunset (and is golden first thing in the morning)
+	// golden hour: the evening light starts warming from mid-afternoon; mornings are a softer gold
+	float Warm = FMath::Pow(FMath::Clamp(1.f - (Elevation - 4.f) / 44.f, 0.f, 1.f), 1.15f);
+	if (T < 0.5f)
+	{
+		Warm *= 0.55f;
+	}
+	Golden = Warm;
+	SunElevation = Elevation;
+	Sun->GetLightComponent()->SetLightColor(FMath::Lerp(SunColorBase, FLinearColor(1.f, 0.58f, 0.32f), Warm * 0.8f));
 }
 
 // ---------------------------------------------------------------- goals
@@ -301,6 +437,8 @@ void UFVDaySubsystem::UpdateGoals(float DeltaTime)
 					{
 						AI->StopHiding();
 					}
+					ShowHint(EFVHint::PickUp);
+					ShowHint(EFVHint::Sparkle);
 				}
 			}
 			break;
@@ -483,6 +621,7 @@ void UFVDaySubsystem::Tick(float DeltaTime)
 	{
 		return;
 	}
+	UpdateIntroAndHints(DeltaTime);
 
 	// the clock only starts once he's been found (the morning search isn't against the clock)
 	const bool bSearching = HasGoal(EFVGoal::FindValentino);

@@ -7,6 +7,7 @@
 #include "FVDog.h"
 #include "FVFamilyMemberData.h"
 #include "FVForagePlant.h"
+#include "FVDecor.h"
 #include "FVGameInstance.h"
 #include "FVGameModes.h"
 #include "FVPixelArt.h"
@@ -51,10 +52,15 @@ void AFVHUD::DrawPauseMenu()
 	const float P = Px();
 	const float T = GetWorld()->GetRealTimeSeconds();
 	DrawRect(FLinearColor(0.02f, 0.f, 0.08f, 0.6f), 0.f, 0.f, CW, CH);
+	if (bShop)
+	{
+		DrawShop();
+		return;
+	}
 	const float H2 = FMath::RoundToFloat(P * 2.f);
 	FVPixel::DrawTextCentred(this, TEXT("PAUSED"), CW * 0.5f, CH * 0.2f, H2, White, &SunsetRows(), FMath::RoundToFloat(H2 * 0.45f), ShadowPurple);
-
-	const TPair<const TCHAR*, FName> Buttons[] = {{TEXT("RESUME"), TEXT("Resume")}, {TEXT("MAIN MENU"), TEXT("MainMenu")}, {TEXT("QUIT"), TEXT("Quit")}};
+	const TPair<const TCHAR*, FName> Buttons[] = {{TEXT("RESUME"), TEXT("Resume")}, {TEXT("DECORATE"), TEXT("Decorate")},
+		{TEXT("MAIN MENU"), TEXT("MainMenu")}, {TEXT("QUIT"), TEXT("Quit")}};
 	const float W = FVPixel::TextWidth(TEXT("MAIN MENU"), P) + 14.f * P;
 	const float H = 11.f * P;
 	float Y = CH * 0.4f;
@@ -73,6 +79,81 @@ void AFVHUD::DrawPauseMenu()
 		AddHitBox(FVector2D(X, Y), FVector2D(W, H), B.Value, true);
 		Y += H + 3.f * P;
 	}
+	FVPixel::DrawScanlines(this, CW, CH, FMath::Max(3.f, FMath::RoundToFloat(P * 0.5f)), 0.14f);
+}
+
+void AFVHUD::DrawShop()
+{
+	const float CW = Canvas->ClipX, CH = Canvas->ClipY;
+	const float P = Px();
+	const float S = FMath::Max(2.f, FMath::RoundToFloat(P * 0.7f));
+	const float T = GetWorld()->GetRealTimeSeconds();
+	const UFVDecorSubsystem* Decor = GetWorld()->GetSubsystem<UFVDecorSubsystem>();
+	const int32 Savings = Decor ? Decor->GetSavings() : 0;
+	const float H2 = FMath::RoundToFloat(P * 1.8f);
+	FVPixel::DrawTextCentred(this, TEXT("DECORATE"), CW * 0.5f, CH * 0.08f, H2, White, &SunsetRows(), FMath::RoundToFloat(H2 * 0.45f), ShadowPurple);
+	FVPixel::DrawTextCentred(this, FString::Printf(TEXT("GARDEN POINTS %06d"), Savings), CW * 0.5f, CH * 0.08f + 10.f * H2, S, Yellow, nullptr, S * 0.4f, ShadowPurple);
+
+	const auto& Items = UFVDecorSubsystem::Catalog();
+	const float RowH = 11.f * S;
+	// wide enough for the longest name, a little sprout mark and the price
+	float NameW = 0.f;
+	for (const FFVDecorDef& D : Items)
+	{
+		NameW = FMath::Max(NameW, FVPixel::TextWidth(D.Name, S));
+	}
+	const float W = FMath::Min(CW * 0.9f, NameW + FVPixel::TextWidth(TEXT("0000"), S) + 22.f * S);
+	const float X = (CW - W) * 0.5f;
+	float Y = CH * 0.08f + 10.f * H2 + 14.f * S;
+	const FFVDecorDef* Hovered = nullptr;
+	for (int32 i = 0; i < Items.Num(); ++i)
+	{
+		const FFVDecorDef& D = Items[i];
+		const FName Box(*FString::Printf(TEXT("Buy%d"), i));
+		const bool bSel = Hover == Box;
+		const bool bCan = Savings >= D.Price;
+		if (bSel)
+		{
+			Hovered = &D;
+		}
+		FVPixel::DrawBox(this, X, Y, W, RowH, S * 0.6f, bSel ? Magenta : Ink, bSel ? Yellow : (bCan ? Cyan : FLinearColor(0.3f, 0.3f, 0.45f)));
+		const FLinearColor TextC = bCan ? (bSel ? Yellow : White) : FLinearColor(0.5f, 0.5f, 0.6f);
+		FVPixel::DrawText(this, D.Name, X + 4.f * S, Y + 2.f * S, S, TextC);
+		const FString Price = FString::Printf(TEXT("%d"), D.Price);
+		FVPixel::DrawText(this, Price, X + W - 4.f * S - FVPixel::TextWidth(Price, S), Y + 2.f * S, S, bCan ? Yellow : TextC);
+		if (D.bPlant)
+		{
+			// a little green sprout mark for plants
+			const float SX = X + 4.f * S + NameW + 5.f * S;
+			const FLinearColor Leaf(0.35f, 0.85f, 0.3f);
+			DrawRect(Leaf, SX + S, Y + 4.f * S, S, 5.f * S);
+			DrawRect(Leaf, SX, Y + 4.f * S, S, S);
+			DrawRect(Leaf, SX + 2.f * S, Y + 5.f * S, S, S);
+		}
+		AddHitBox(FVector2D(X, Y), FVector2D(W, RowH), Box, true);
+		Y += RowH + S;
+	}
+	// what the hovered thing is for
+	Y += 3.f * S;
+	if (Hovered)
+	{
+		FVPixel::DrawTextCentred(this, Hovered->Blurb, CW * 0.5f, Y, S, Cyan);
+		if (Savings < Hovered->Price && FMath::Fmod(T, 1.f) < 0.6f)
+		{
+			FVPixel::DrawTextCentred(this, TEXT("NOT ENOUGH POINTS YET"), CW * 0.5f, Y + 10.f * S, S, Red);
+		}
+	}
+	else
+	{
+		FVPixel::DrawTextCentred(this, TEXT("EVERY POINT YOU EARN GOES IN YOUR GARDEN POINTS"), CW * 0.5f, Y, S, FLinearColor(0.6f, 0.6f, 0.75f));
+	}
+	// BACK
+	const float BW = FVPixel::TextWidth(TEXT("BACK"), P) + 12.f * P, BH = 11.f * P;
+	const float BX = (CW - BW) * 0.5f, BY = Y + 22.f * S;
+	const bool bSel = Hover == TEXT("ShopBack");
+	FVPixel::DrawBox(this, BX, BY, BW, BH, P, bSel ? Magenta : Ink, bSel ? Yellow : Cyan);
+	FVPixel::DrawTextCentred(this, TEXT("BACK"), CW * 0.5f, BY + 2.f * P, P, bSel ? Yellow : White, nullptr, P * 0.5f, ShadowPurple);
+	AddHitBox(FVector2D(BX, BY), FVector2D(BW, BH), TEXT("ShopBack"), true);
 	FVPixel::DrawScanlines(this, CW, CH, FMath::Max(3.f, FMath::RoundToFloat(P * 0.5f)), 0.14f);
 }
 
@@ -174,6 +255,33 @@ void AFVHUD::NotifyHitBoxClick(FName BoxName)
 	{
 		UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
 	}
+	else if (BoxName == TEXT("Decorate"))
+	{
+		bShop = true;
+	}
+	else if (BoxName == TEXT("ShopBack"))
+	{
+		bShop = false;
+	}
+	else if (BoxName.ToString().StartsWith(TEXT("Buy")) && PC)
+	{
+		const int32 Index = FCString::Atoi(*BoxName.ToString().Mid(3));
+		UFVDecorSubsystem* Decor = GetWorld()->GetSubsystem<UFVDecorSubsystem>();
+		const FString Msg = Decor ? Decor->Buy(Index, PC->GetPawn()) : FString();
+		if (Msg.IsEmpty())
+		{
+			FVAudio::Play2D(this, EFVSound::UIBack, 0.5f); // can't afford it yet
+		}
+		else
+		{
+			bShop = false;
+			PC->TogglePauseMenu(); // back to the garden to see it
+			if (UFVCarryComponent* C = PC->GetPawn() ? PC->GetPawn()->FindComponentByClass<UFVCarryComponent>() : nullptr)
+			{
+				C->ShowToast(FText::FromString(Msg), 4.f);
+			}
+		}
+	}
 }
 
 void AFVHUD::DrawPrompt(const FText& Text, float Y, const FLinearColor& TextColor)
@@ -244,6 +352,7 @@ void AFVHUD::DrawHUD()
 			DrawPauseMenu();
 			return;
 		}
+		bShop = false; // the shop always opens from the pause menu's first page
 	}
 	const float CH = Canvas->ClipY;
 	const float P = Px();
@@ -558,5 +667,88 @@ void AFVHUD::DrawHUD()
 			DY += R * 2.f + 1.5f * TS;
 		}
 		FVPixel::DrawTextCentred(this, Msg, BX + W * 0.5f, BY + (H - 7.f * TS) * 0.5f, TS, Edge);
+	}
+	DrawIntroAndHint();
+}
+
+void AFVHUD::DrawIntroAndHint()
+{
+	const UFVDaySubsystem* Day = GetWorld()->GetSubsystem<UFVDaySubsystem>();
+	if (!Day || !Day->IsRunning())
+	{
+		return;
+	}
+	const float CW = Canvas->ClipX, CH = Canvas->ClipY;
+	const float P = Px();
+	const float S = FMath::Max(2.f, FMath::RoundToFloat(P * 0.6f));
+	const float T = GetWorld()->GetRealTimeSeconds();
+
+	if (Day->IsIntroShowing())
+	{
+		// the story card: Valentino got out again
+		const float Fade = FMath::Clamp(Day->GetIntroAge() / 0.4f, 0.f, 1.f);
+		DrawRect(FLinearColor(0.02f, 0.f, 0.08f, 0.45f * Fade), 0.f, 0.f, CW, CH);
+		const float H2 = FMath::RoundToFloat(P * 1.6f);
+		const TArray<FString> Lines = {
+			TEXT("HE'S HIDING SOMEWHERE IN THE GARDEN."),
+			TEXT("FIND HIM, FEED HIM, KEEP HIM HAPPY..."),
+			TEXT("AND TUCK HIM IN BEFORE DARK."),
+		};
+		float W = FVPixel::TextWidth(TEXT("VALENTINO GOT OUT AGAIN!"), H2);
+		for (const FString& L : Lines)
+		{
+			W = FMath::Max(W, FVPixel::TextWidth(L, S));
+		}
+		W += 16.f * S;
+		const float BH = 8.f * S + 9.f * H2 + 6.f * S + Lines.Num() * 11.f * S + 18.f * S + 16.f * S;
+		const float BX = (CW - W) * 0.5f, BY = CH * 0.28f;
+		FVPixel::DrawBox(this, BX, BY, W, BH, S, Ink, Magenta);
+		float Y = BY + 8.f * S;
+		FVPixel::DrawTextCentred(this, TEXT("VALENTINO GOT OUT AGAIN!"), CW * 0.5f, Y, H2, White, &SunsetRows(), FMath::RoundToFloat(H2 * 0.45f), ShadowPurple);
+		Y += 9.f * H2 + 6.f * S;
+		for (const FString& L : Lines)
+		{
+			FVPixel::DrawTextCentred(this, L, CW * 0.5f, Y, S, Cyan);
+			Y += 11.f * S;
+		}
+		// a little tortoise trundling across the bottom of the card
+		const float TW = 16.f * S;
+		const float Walk = FMath::Fmod(T * 18.f * S, W - TW - 8.f * S);
+		FVPixel::DrawTortoise(this, BX + 4.f * S + Walk, Y + 2.f * S, S, FMath::Fmod(T, 0.5f) < 0.25f ? 0 : 1);
+		Y += 16.f * S;
+		if (FMath::Fmod(T, 1.f) < 0.65f)
+		{
+			FVPixel::DrawTextCentred(this, TEXT("PRESS E OR CLICK TO START"), CW * 0.5f, Y, S, Yellow);
+		}
+		return;
+	}
+
+	const FString Hint = Day->GetHint();
+	if (!Hint.IsEmpty())
+	{
+		// a "TIP" box above the button prompts; slides in, fades out
+		const float Age = Day->GetHintAge();
+		const float A = FMath::Clamp(FMath::Min(Age / 0.3f, (8.f - Age) / 0.6f), 0.f, 1.f);
+		const float MaxW = FMath::Min(CW * 0.55f, 120.f * S);
+		const TArray<FString> Lines = FVPixel::Wrap(Hint, S, MaxW);
+		float W = 0.f;
+		for (const FString& L : Lines)
+		{
+			W = FMath::Max(W, FVPixel::TextWidth(L, S));
+		}
+		const float TagW = FVPixel::TextWidth(TEXT("TIP"), S) + 6.f * S;
+		W += TagW + 12.f * S;
+		const float H = 6.f * S + Lines.Num() * 10.f * S;
+		const float X = (CW - W) * 0.5f;
+		const float Y = CH * PromptY - H - 6.f * S + (1.f - A) * 8.f * S;
+		FVPixel::DrawBox(this, X, Y, W, H, S * 0.75f, FLinearColor(Ink.R, Ink.G, Ink.B, Ink.A * A), FLinearColor(Yellow.R, Yellow.G, Yellow.B, A));
+		FVPixel::DrawBox(this, X + 3.f * S, Y + 3.f * S, TagW, 11.f * S, S * 0.6f, FLinearColor(0.15f, 0.1f, 0.3f, A), FLinearColor(Yellow.R, Yellow.G, Yellow.B, A));
+		FVPixel::DrawText(this, TEXT("TIP"), X + 6.f * S, Y + 5.f * S, S, FLinearColor(Yellow.R, Yellow.G, Yellow.B, A));
+		float LY = Y + 5.f * S;
+		for (const FString& L : Lines)
+		{
+			FVPixel::DrawText(this, L, X + TagW + 8.f * S, LY, S, FLinearColor(1.f, 1.f, 1.f, A));
+			LY += 10.f * S;
+		}
 	}
 }

@@ -74,6 +74,11 @@ public:
 	/** Console: "SkipTime 3" jumps the day's clock forward 3 hours (testing). */
 	UFUNCTION(Exec)
 	void SkipTime(float Hours);
+	/** Console (testing): "GardenPoints 1000" adds garden points; "BuyDecor 2" buys catalogue item 2. */
+	UFUNCTION(Exec)
+	void GardenPoints(int32 Points);
+	UFUNCTION(Exec)
+	void BuyDecor(int32 Index);
 
 	/** End of the day: pause and show the summary (NEXT DAY / MAIN MENU). */
 	void ShowDaySummary();

@@ -45,7 +45,7 @@ void AFVValentino::BeginPlay()
 float AFVValentino::GetWarmthFactor() const
 {
 	const float T = FMath::GetRangePct(ColdTemperature, ComfortTemperature, Temperature);
-	return FMath::Clamp(0.2f + 0.8f * T, 0.2f, 1.3f);
+	return FMath::Clamp(0.2f + 0.8f * T + BaskWarmth, 0.2f, 1.3f);
 }
 
 void AFVValentino::SetRetracted(bool bInShell)
@@ -143,6 +143,12 @@ bool AFVValentino::Eat(EFVFoodType Food, float EnergyValue)
 
 FString AFVValentino::GetThought() const
 {
+	if (!bHasCraving && State == EFVValentinoState::Basking && !bRetracted)
+	{
+		static const TCHAR* Bask[] = { TEXT("AHH... WARM SUN..."), TEXT("BEST ROCK EVER."), TEXT("SOAKING UP THE SUN") };
+		const int32 Phase = FMath::FloorToInt(GetWorld()->GetTimeSeconds() / 6.f);
+		return Phase % 3 == 2 ? FString() : FString(Bask[(Phase / 3) % 3]); // now and then, not all the time
+	}
 	if (!bHasCraving || bRetracted || IsEating() || State == EFVValentinoState::Hiding || State == EFVValentinoState::GoingToHide)
 	{
 		return FString();
@@ -196,6 +202,7 @@ void AFVValentino::Tick(float DeltaSeconds)
 	{
 		Energy = FMath::Clamp(Energy - (Speed2D * DeltaSeconds / 100.f) * EnergyPerMetre - EnergyPerSecond * DeltaSeconds, 0.f, 1.f);
 	}
+	BaskWarmth = FMath::Max(0.f, BaskWarmth - DeltaSeconds * 0.0015f); // the warmth from basking wears off slowly
 	Thirst = FMath::Clamp(Thirst + DeltaSeconds / FMath::Max(SecondsToThirsty, 1.f) * FMath::Max(GetWarmthFactor(), 0.3f), 0.f, 1.f);
 
 	const float EnergyFactor = 0.45f + 0.55f * Energy;

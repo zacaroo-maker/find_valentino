@@ -37,6 +37,13 @@ struct FFVGoal
 	float Age = 0.f;
 };
 
+/** First-time tips, each shown once ever. */
+enum class EFVHint : uint8
+{
+	Move, Search, PickUp, Sparkle, Goals, Craving, Ball, Can, Pet, Bedtime, Decorate,
+	Count
+};
+
 struct FFVPopup
 {
 	FString Text;
@@ -68,6 +75,20 @@ public:
 	const TArray<FFVPopup>& GetPopups() const { return Popups; }
 	FString GetBanner() const { return BannerTime > 0.f ? Banner : FString(); }
 	float GetBannerTime() const { return BannerTime; }
+
+	// ---- intro card and tips ----
+	bool IsIntroShowing() const { return bIntro; }
+	float GetIntroAge() const { return IntroAge; }
+	/** The tip on screen right now (empty if none) and how long it has been up. */
+	FString GetHint() const { return HintText; }
+	float GetHintAge() const { return HintAge; }
+	/** Queue a first-time tip (ignored if it has been seen before). */
+	void ShowHint(EFVHint Hint);
+
+	// ---- for the weather's look ----
+	/** 0 at midday .. 1 when the sun is low and golden. */
+	float GetGolden() const { return Golden; }
+	float GetSunElevation() const { return SunElevation; }
 
 	// ---- end of day ----
 	bool IsSummaryShowing() const { return bSummary; }
@@ -129,6 +150,18 @@ private:
 	int32 Fetches = 0;        // balls Diego brought back today
 	int32 FetchPoints = 0;
 	float NextCravingIn = 40.f;
+	float Golden = 0.f;
+	float SunElevation = 45.f;
+
+	void UpdateIntroAndHints(float DeltaTime);
+	bool bIntro = false;
+	float IntroAge = 0.f;
+	int32 HintsSeen = 0;
+	TArray<EFVHint> HintQueue;
+	FString HintText;
+	float HintAge = 0.f;
+	float HintGap = 0.f;
+	float SearchTime = 0.f;
 	void SetCraving(bool bOn, EFVFoodType Food = EFVFoodType::Romaine);
 
 	UPROPERTY(Transient)

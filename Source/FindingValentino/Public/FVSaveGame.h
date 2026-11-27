@@ -5,6 +5,17 @@
 #include "GameFramework/SaveGame.h"
 #include "FVSaveGame.generated.h"
 
+/** Something bought for Valentino's yard, and where it was put. */
+USTRUCT()
+struct FFVDecorSave
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	FName Type;
+	UPROPERTY()
+	FTransform Transform;
+};
+
 UCLASS()
 class FINDINGVALENTINO_API UFVSaveGame : public USaveGame
 {
@@ -19,6 +30,15 @@ public:
 	int32 LastScore = 0;
 	UPROPERTY()
 	int32 DaysPlayed = 0;
+	/** First-time tips already shown (bit per tip). */
+	UPROPERTY()
+	int32 HintsSeen = 0;
+	/** Garden points to spend on decorations: every point earned, minus what's been spent. */
+	UPROPERTY()
+	int32 Savings = 0;
+	/** Decorations bought for Valentino's yard. */
+	UPROPERTY()
+	TArray<FFVDecorSave> Decor;
 
 	static constexpr const TCHAR* Slot = TEXT("FindingValentino");
 	/** Loads the save (or a fresh one). */
