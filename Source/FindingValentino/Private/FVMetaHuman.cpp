@@ -6,6 +6,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "FVFamilyMemberData.h"
 
 namespace
 {
@@ -62,6 +65,14 @@ void FVMetaHuman::SetHeadHidden(ACharacter* Character, bool bHidden)
 	{
 		return;
 	}
+	// cartoon heads (first-person view looks out from inside them)
+	for (UActorComponent* C : Character->GetComponents())
+	{
+		if (C->ComponentHasTag(TEXT("FV_ToonHead")))
+		{
+			Cast<USceneComponent>(C)->SetHiddenInGame(bHidden);
+		}
+	}
 	TArray<AActor*> Attached;
 	Character->GetAttachedActors(Attached, true, true);
 	for (AActor* A : Attached)
@@ -101,4 +112,45 @@ void FVMetaHuman::UseAnimFrame(ACharacter* Character, bool bFemale)
 	{
 		Character->GetMesh()->SetAnimInstanceClass(Anim);
 	}
+}
+
+void FVMetaHuman::AttachToonParts(ACharacter* Character, const TArray<FFVToonPart>& Parts, TArray<TObjectPtr<UStaticMeshComponent>>& OutComponents)
+{
+	USkeletalMeshComponent* Leader = Character ? Character->GetMesh() : nullptr;
+	const USkeletalMesh* SkelMesh = Leader ? Leader->GetSkeletalMeshAsset() : nullptr;
+	if (!SkelMesh)
+	{
+		return;
+	}
+	const FReferenceSkeleton& Ref = SkelMesh->GetRefSkeleton();
+	for (const FFVToonPart& Part : Parts)
+	{
+		const int32 Bone = Ref.FindBoneIndex(Part.Bone);
+		if (!Part.Mesh || Bone == INDEX_NONE)
+		{
+			continue;
+		}
+		// the bone's reference pose in component space: the piece was modelled there, so undo it
+		FTransform BoneRef = Ref.GetRefBonePose()[Bone];
+		for (int32 P = Ref.GetParentIndex(Bone); P != INDEX_NONE; P = Ref.GetParentIndex(P))
+		{
+			BoneRef = BoneRef * Ref.GetRefBonePose()[P];
+		}
+		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Character);
+		C->SetStaticMesh(Part.Mesh);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCanEverAffectNavigation(false);
+		C->SetupAttachment(Leader, Part.Bone);
+		C->SetRelativeTransform(BoneRef.Inverse());
+		if (Part.Bone == TEXT("head"))
+		{
+			C->ComponentTags.Add(TEXT("FV_ToonHead"));
+		}
+		C->RegisterComponent();
+		OutComponents.Add(C);
+	}
+	// the mannequin keeps animating (the pieces ride its bones) but is never drawn
+	Leader->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	Leader->SetCastShadow(false);
+	Leader->SetVisibility(false, false);
 }

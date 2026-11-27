@@ -88,6 +88,15 @@ void AFVFamilyCharacter::ApplyMemberData(UFVFamilyMemberData* Member)
 	}
 	GetCharacterMovement()->MaxWalkSpeed = MemberData->WalkSpeed;
 	CameraMode->FirstPersonEyeOffset.Z = MemberData->FirstPersonEyeHeight;
+	if (MemberData->ToonParts.Num() > 0)
+	{
+		if (ToonParts.Num() == 0)
+		{
+			FVMetaHuman::UseAnimFrame(this, MemberData->bFemaleFrame);
+			FVMetaHuman::AttachToonParts(this, MemberData->ToonParts, ToonParts);
+		}
+		return;
+	}
 	if (!MetaHumanActor && !MemberData->MetaHumanClass.IsNull())
 	{
 		FVMetaHuman::UseAnimFrame(this, MemberData->bFemaleFrame);

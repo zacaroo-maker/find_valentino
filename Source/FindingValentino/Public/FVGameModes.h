@@ -79,6 +79,10 @@ public:
 	void GardenPoints(int32 Points);
 	UFUNCTION(Exec)
 	void BuyDecor(int32 Index);
+	/** Console (testing): "Photo front 330 40 115" saves Saved/Photos/front.png, taken from in front of the player
+	 *  (distance, sideways offset, camera height above the feet). Works even when the screen is off. */
+	UFUNCTION(Exec)
+	void Photo(const FString& Name, float Distance = 330.f, float Side = 40.f, float Height = 115.f);
 
 	/** End of the day: pause and show the summary (NEXT DAY / MAIN MENU). */
 	void ShowDaySummary();

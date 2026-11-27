@@ -6,7 +6,20 @@
 #include "FVFamilyMemberData.generated.h"
 
 class USkeletalMesh;
+class UStaticMesh;
 class UTexture2D;
+
+/** One rigid piece of a cartoon body, riding on a mannequin bone. Modelled in the mannequin's reference
+ *  (component) space, so it lines up with the bone without any offset. */
+USTRUCT(BlueprintType)
+struct FFVToonPart
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Toon")
+	FName Bone;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Toon")
+	TObjectPtr<UStaticMesh> Mesh;
+};
 
 UCLASS(BlueprintType)
 class FINDINGVALENTINO_API UFVFamilyMemberData : public UPrimaryDataAsset
@@ -30,6 +43,9 @@ public:
 	/** Their assembled MetaHuman (e.g. BP_Mom). Used when CharacterClass is empty: the standard family character wears it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family")
 	TSoftClassPtr<AActor> MetaHumanClass;
+	/** A cartoon body made of rigid pieces on the mannequin's bones (used instead of a MetaHuman when set). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family|Toon")
+	TArray<FFVToonPart> ToonParts;
 	/** Animate with the female mannequin (Quinn) instead of the male one (Manny). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Family")
 	bool bFemaleFrame = false;

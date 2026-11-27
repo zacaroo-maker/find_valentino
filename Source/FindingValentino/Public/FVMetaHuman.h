@@ -7,6 +7,8 @@
 
 class ACharacter;
 class AActor;
+class UStaticMeshComponent;
+struct FFVToonPart;
 
 namespace FVMetaHuman
 {
@@ -18,4 +20,7 @@ namespace FVMetaHuman
 
 	/** Gives the character the mannequin + animation blueprint to drive a MetaHuman: female frame (Quinn) or male (Manny). */
 	FINDINGVALENTINO_API void UseAnimFrame(ACharacter* Character, bool bFemale);
+
+	/** Puts a cartoon body on the character: each rigid piece rides its mannequin bone; the mannequin keeps animating but is hidden. */
+	FINDINGVALENTINO_API void AttachToonParts(ACharacter* Character, const TArray<FFVToonPart>& Parts, TArray<TObjectPtr<UStaticMeshComponent>>& OutComponents);
 }

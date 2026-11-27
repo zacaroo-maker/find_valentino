@@ -20,6 +20,11 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Engine/SceneCapture2D.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Misc/Paths.h"
 
 // ---------------------------------------------------------------- garden game mode
 
@@ -89,6 +94,11 @@ UClass* AFVGameMode::GetDefaultPawnClassForController_Implementation(AController
 	// use the member's own character (e.g. their MetaHuman) when one exists, otherwise the level's default
 	if (const UFVFamilyMemberData* M = GetSelectedMember())
 	{
+		// a cartoon body: the standard family character wears it
+		if (M->ToonParts.Num() > 0)
+		{
+			return AFVFamilyCharacter::StaticClass();
+		}
 		if (UClass* C = M->CharacterClass.LoadSynchronous())
 		{
 			return C;
@@ -218,6 +228,52 @@ void AFVPlayerController::BuyDecor(int32 Index)
 	{
 		UE_LOG(LogTemp, Log, TEXT("FVDecor: %s"), *D->Buy(Index, GetPawn()));
 	}
+}
+
+void AFVPlayerController::Photo(const FString& Name, float Distance, float Side, float Height)
+{
+	APawn* P = GetPawn();
+	if (!P)
+	{
+		return;
+	}
+	const float HalfHeight = P->GetSimpleCollisionHalfHeight();
+	const FVector Feet = P->GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+	const FVector Fwd = P->GetActorForwardVector(), Right = P->GetActorRightVector();
+	const FVector Eye = Feet + Fwd * Distance + Right * Side + FVector(0.f, 0.f, Height);
+	const FVector Target = Feet + Fwd * (Distance * 0.18f) + FVector(0.f, 0.f, 70.f);
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ASceneCapture2D* Cam = GetWorld()->SpawnActor<ASceneCapture2D>(Eye, (Target - Eye).Rotation(), SP);
+	if (!Cam)
+	{
+		return;
+	}
+	UTextureRenderTarget2D* RT = UKismetRenderingLibrary::CreateRenderTarget2D(this, 1280, 960, RTF_RGBA8);
+	USceneCaptureComponent2D* C = Cam->GetCaptureComponent2D();
+	C->TextureTarget = RT;
+	C->CaptureSource = SCS_FinalToneCurveHDR;
+	C->FOVAngle = 55.f;
+	// keep rendering for a moment so the camera's auto exposure settles, then save and clean up
+	C->bCaptureEveryFrame = true;
+	C->bAlwaysPersistRenderingState = true;
+	TWeakObjectPtr<ASceneCapture2D> WeakCam = Cam;
+	TWeakObjectPtr<UTextureRenderTarget2D> WeakRT = RT;
+	TWeakObjectPtr<AFVPlayerController> WeakThis = this;
+	FTimerHandle H;
+	GetWorldTimerManager().SetTimer(H, [WeakCam, WeakRT, WeakThis, Name]()
+	{
+		if (WeakCam.IsValid() && WeakRT.IsValid() && WeakThis.IsValid())
+		{
+			const FString Dir = FPaths::ProjectSavedDir() / TEXT("Photos");
+			UKismetRenderingLibrary::ExportRenderTarget(WeakThis.Get(), WeakRT.Get(), Dir, Name + TEXT(".png"));
+			UE_LOG(LogTemp, Log, TEXT("FVPhoto: %s/%s.png"), *Dir, *Name);
+		}
+		if (WeakCam.IsValid())
+		{
+			WeakCam->Destroy();
+		}
+	}, 2.5f, false);
 }
 
 void AFVPlayerController::ShowDaySummary()

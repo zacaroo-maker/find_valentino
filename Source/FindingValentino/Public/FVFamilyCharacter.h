@@ -72,6 +72,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> MetaHumanActor;
+	/** Cartoon body pieces (when the member has ToonParts). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UStaticMeshComponent>> ToonParts;
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
