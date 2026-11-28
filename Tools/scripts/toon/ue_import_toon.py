@@ -30,11 +30,11 @@ def hook(bp_path, mesh_path, anim_prefix, props):
 
 # --- Valentino ---
 import_skel("Valentino_Toon.fbx", "/Game/Toon/Valentino", "SK_Valentino_Toon")
-hook("/Game/Characters/Valentino/BP_Valentino", "/Game/Toon/Valentino/SK_Valentino_Toon", "/Game/Toon/Valentino/SK_Valentino_Toon_Anim_Armature_",
+hook("/Game/Characters/Valentino/BP_Valentino", "/Game/Toon/Valentino/SK_Valentino_Toon", "/Game/Toon/Valentino/SK_Valentino_ToonArmature_",
      (("idle_anim", "Idle"), ("walk_anim", "Walk"), ("hide_anim", "Hide"), ("emerge_anim", "Emerge")))
 # --- Diego (and the other dogs, which share the dog mesh) ---
 import_skel("Dog_Toon.fbx", "/Game/Toon/Dog", "SK_Dog_Toon")
-hook("/Game/Characters/Dog/BP_Dog", "/Game/Toon/Dog/SK_Dog_Toon", "/Game/Toon/Dog/SK_Dog_Toon_Anim_Armature_",
+hook("/Game/Characters/Dog/BP_Dog", "/Game/Toon/Dog/SK_Dog_Toon", "/Game/Toon/Dog/SK_Dog_ToonArmature_",
      (("idle_anim", "Idle"), ("walk_anim", "Walk"), ("sniff_anim", "Sniff"), ("lie_down_anim", "LieDown"), ("lying_anim", "Lying"), ("get_up_anim", "GetUp")))
 # level instances that override the mesh get the new one too
 world = unreal.EditorLevelLibrary.get_editor_world()
