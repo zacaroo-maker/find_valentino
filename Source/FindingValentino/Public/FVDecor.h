@@ -38,6 +38,11 @@ public:
 	int32 GetSavings() const { return Savings; }
 	/** Points earned today also go into savings (written to the save file). */
 	void AddSavings(int32 Points);
+	/** All points earned (spending doesn't lower it); reaching the gate's target opens the dog park. */
+	int32 GetTotalEarned() const { return TotalEarned; }
+	bool IsParkUnlocked() const { return bParkUnlocked; }
+	/** Testing: open the park now, or lock it again and start the count over. */
+	void SetParkUnlocked(bool bOpen);
 	/** Buy something and put it in front of Who. Returns a message for the player (empty = couldn't afford it). */
 	FString Buy(int32 CatalogIndex, APawn* Who);
 	/** A bought prop was carried somewhere new. */
@@ -46,4 +51,6 @@ public:
 private:
 	AActor* SpawnDecor(const FFVDecorDef& Def, const FTransform& Where, int32 SaveIndex);
 	int32 Savings = 0;
+	int32 TotalEarned = 0;
+	bool bParkUnlocked = false;
 };

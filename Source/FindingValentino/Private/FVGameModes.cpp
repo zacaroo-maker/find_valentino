@@ -222,6 +222,14 @@ void AFVPlayerController::GardenPoints(int32 Points)
 	}
 }
 
+void AFVPlayerController::ParkGate(int32 bOpen)
+{
+	if (UFVDecorSubsystem* D = GetWorld()->GetSubsystem<UFVDecorSubsystem>())
+	{
+		D->SetParkUnlocked(bOpen != 0);
+	}
+}
+
 void AFVPlayerController::BuyDecor(int32 Index)
 {
 	if (UFVDecorSubsystem* D = GetWorld()->GetSubsystem<UFVDecorSubsystem>())

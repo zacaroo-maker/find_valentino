@@ -283,6 +283,14 @@ void UFVDaySubsystem::AddScore(int32 Points, const FString& Why, const FString& 
 	FVAudio::Play2D(this, bBig ? EFVSound::UIStart : EFVSound::UISelect, bBig ? 0.45f : 0.35f);
 }
 
+void UFVDaySubsystem::AddPopup(const FString& Text, bool bBig)
+{
+	FFVPopup P;
+	P.Text = Text;
+	P.bBig = bBig;
+	Popups.Add(P);
+}
+
 void UFVDaySubsystem::Announce(const FString& Text, float Seconds)
 {
 	Banner = Text;
@@ -370,7 +378,9 @@ void UFVDaySubsystem::MaybeAddGoal()
 			Options.Add([this, B]() { AddGoal(EFVGoal::WaterBed, FString::Printf(TEXT("WATER THE %s"), *B->DisplayName.ToString().ToUpper()), B); });
 		}
 	}
-	if (D && !HasGoal(EFVGoal::DiegoPark) && D->Energy > 0.3f && !D->bInPark)
+	const UFVDecorSubsystem* DecorSub = GetWorld()->GetSubsystem<UFVDecorSubsystem>();
+	const bool bParkOpen = DecorSub && DecorSub->IsParkUnlocked();
+	if (D && bParkOpen && !HasGoal(EFVGoal::DiegoPark) && D->Energy > 0.3f && !D->bInPark)
 	{
 		Options.Add([this, D]() { AddGoal(EFVGoal::DiegoPark, TEXT("TAKE DIEGO TO THE DOG PARK"), D, 0, 15.f); });
 	}

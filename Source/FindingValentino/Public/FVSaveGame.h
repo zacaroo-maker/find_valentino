@@ -36,6 +36,12 @@ public:
 	/** Garden points to spend on decorations: every point earned, minus what's been spent. */
 	UPROPERTY()
 	int32 Savings = 0;
+	/** Every garden point earned since the dog park gate was added (spending doesn't lower it). Opens the gate. */
+	UPROPERTY()
+	int32 TotalEarned = 0;
+	/** The dog park gate has been unlocked. */
+	UPROPERTY()
+	bool bParkUnlocked = false;
 	/** Decorations bought for Valentino's yard. */
 	UPROPERTY()
 	TArray<FFVDecorSave> Decor;

@@ -111,6 +111,11 @@ public:
 	float BedtimeHour = 18.5f;
 	float EndHour = 20.f;
 
+	/** A big banner across the screen (e.g. "THE DOG PARK IS OPEN!"). */
+	void Notice(const FString& Text, float Seconds = 3.f) { Announce(Text, Seconds); }
+	/** A floating message like the score popups, without points. */
+	void AddPopup(const FString& Text, bool bBig = false);
+
 private:
 	void AddScore(int32 Points, const FString& Why, const FString& Category, bool bBig = false);
 	void Announce(const FString& Text, float Seconds = 3.f);

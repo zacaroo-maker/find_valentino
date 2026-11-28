@@ -79,6 +79,9 @@ public:
 	void GardenPoints(int32 Points);
 	UFUNCTION(Exec)
 	void BuyDecor(int32 Index);
+	/** Console (testing): "ParkGate 1" opens the dog park now; "ParkGate 0" locks it again and restarts the count. */
+	UFUNCTION(Exec)
+	void ParkGate(int32 bOpen);
 	/** Console (testing): "Photo front 330 40 115" saves Saved/Photos/front.png, taken from in front of the player
 	 *  (distance, sideways offset, camera height above the feet). Works even when the screen is off. */
 	UFUNCTION(Exec)

@@ -6,6 +6,7 @@
 #include "FVAudio.h"
 #include "FVForagePlant.h"
 #include "FVHidingSpot.h"
+#include "FVParkGate.h"
 #include "FVPickupItem.h"
 #include "FVSaveGame.h"
 #include "GameFramework/Pawn.h"
@@ -76,6 +77,8 @@ void UFVDecorSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	Savings = Save->Savings;
+	TotalEarned = Save->TotalEarned;
+	bParkUnlocked = Save->bParkUnlocked;
 	// put back everything that was bought on earlier days
 	for (int32 i = 0; i < Save->Decor.Num(); ++i)
 	{
@@ -136,10 +139,45 @@ AActor* UFVDecorSubsystem::SpawnDecor(const FFVDecorDef& Def, const FTransform& 
 void UFVDecorSubsystem::AddSavings(int32 Points)
 {
 	Savings += Points;
+	if (Points > 0)
+	{
+		TotalEarned += Points;
+	}
+	AFVParkGate* Gate = AFVParkGate::Find(this);
+	const bool bOpensNow = !bParkUnlocked && TotalEarned >= (Gate ? Gate->PointsToOpen : 1000);
+	if (bOpensNow)
+	{
+		bParkUnlocked = true;
+	}
 	if (UFVSaveGame* Save = UFVSaveGame::Load())
 	{
 		Save->Savings = Savings;
+		Save->TotalEarned = TotalEarned;
+		Save->bParkUnlocked = bParkUnlocked;
 		Save->Save();
+	}
+	if (bOpensNow && Gate)
+	{
+		Gate->Unlock(true);
+	}
+}
+
+void UFVDecorSubsystem::SetParkUnlocked(bool bOpen)
+{
+	bParkUnlocked = bOpen;
+	if (!bOpen)
+	{
+		TotalEarned = 0;
+	}
+	if (UFVSaveGame* Save = UFVSaveGame::Load())
+	{
+		Save->TotalEarned = TotalEarned;
+		Save->bParkUnlocked = bParkUnlocked;
+		Save->Save();
+	}
+	if (AFVParkGate* Gate = AFVParkGate::Find(this))
+	{
+		if (bOpen) { Gate->Unlock(true); } else { Gate->Relock(); }
 	}
 }
 
